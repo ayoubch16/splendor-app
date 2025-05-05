@@ -1,94 +1,68 @@
-import { Injectable } from '@angular/core';
-import { Client, Facture, ArticleTableFacture } from '../interfaces/entites';
+import {Injectable} from '@angular/core';
+import {ArticleTableFacture, Bl, Client, Devis, Facture, TypeDocument} from '../interfaces/entites';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import {PdfDocument, PdfOptions} from "../components/download-pdf/download-pdf.component";
+
+
+interface GeneratePdfOptions {
+  type: TypeDocument;
+  withSignature: boolean;
+  printVersion?: boolean;
+  signatureImageUrl?: string;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class PdfService {
-  constructor() {}
 
   /**
-   * Génère un PDF à partir des informations de la facture ou BL
-   * @param facture - Les informations de la facture
-   * @param options - Options de génération (type de document, avec signature, etc.)
+   * Point d'entrée principal pour générer n'importe quel type de document PDF
    */
-  async generateFacturePdf(facture: Facture, options: {
-    type: 'FACTURE' | 'DEVIS' | 'BL',
-    withSignature: boolean,
-    printVersion?: boolean
-  } = { type: 'FACTURE', withSignature: true }): Promise<Blob> {
+  generateDocumentPdf(document: PdfDocument, options: PdfOptions): Promise<Blob> {
+    switch(options.type) {
+      case 'FACTURE':
+        return this.generatePdf(document as unknown as Facture, options);
+      case 'DEVIS':
+        return this.generatePdf(document as unknown as Devis, options);
+      case 'BL':
+        return this.generatePdf(document as unknown as Bl, options);
+      default:
+        return Promise.reject('Type de document non supporté');
+    }
+  }
+
+  /**
+   * Fonction unifiée pour générer des PDFs (factures, devis, BL)
+   */
+  async generatePdf(
+    document: Facture | Devis | Bl,
+    options: GeneratePdfOptions = { type: TypeDocument.FACTURE, withSignature: true }
+  ): Promise<Blob> {
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 10;
 
-    // En-tête
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SPLENDOR ART', pageWidth / 2, 20, { align: 'center' });
+    // Génération du PDF en plusieurs étapes
+    this.addHeader(doc, pageWidth);
+    this.addClientInfo(doc, this.getClientFromDocument(document), margin);
+    this.addDocumentInfo(doc, document, options.type, pageWidth, margin);
 
-    // Informations client
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`CLIENT: ${facture.client.raisonSociale}`, margin, 40);
-    doc.text(`ADRESSE: ${facture.client.ville?.nom || ''}`, margin, 47);
-    doc.text(`ICE: ${facture.client.ice || ''}`, margin, 54);
+    const articles = this.getArticlesFromDocument(document);
+    this.generateArticlesTable(doc, articles, margin, 70, options.type === 'BL');
 
-    // Informations facture/devis/BL selon le type
-    doc.setFont('helvetica', 'bold');
-    let documentLabel = options.type === 'FACTURE' ? 'FACTURE' :
-      options.type === 'DEVIS' ? 'DEVIS' : 'BON DE LIVRAISON';
+    const yPosition = 70 + articles.length * 10 + 20;
 
-    doc.text(`${documentLabel}: N ${facture.numFacture}`, pageWidth - margin, 40, { align: 'right' });
-    doc.text(`DATE: ${new Date(facture.date).toLocaleDateString('fr-FR')}`, pageWidth - margin, 47, { align: 'right' });
-
-    // Tableau des articles
-    this.generateArticlesTable(doc, facture.articles, margin, 70, options.type === 'BL');
-
-    // Totaux (pas pour les BL)
     if (options.type !== 'BL') {
-      const totalHT = facture.articles.reduce((sum, article) => sum + article.prixTotal, 0);
-      const tva = totalHT * 0.2;
-      const totalTTC = totalHT + tva;
+      this.addTotalsSection(doc, articles, pageWidth, margin, yPosition);
 
-      const yPosition = 70 + facture.articles.length * 10 + 20;
-      doc.setFillColor(240, 240, 240);
-      doc.rect(pageWidth / 2, yPosition, pageWidth / 2 - margin, 30, 'F');
-      doc.setFont('helvetica', 'normal');
-      doc.text('Total H.T', pageWidth / 2 + 5, yPosition + 7);
-      doc.text('T.V.A', pageWidth / 2 + 5, yPosition + 17);
-      doc.text('Total T.T.C', pageWidth / 2 + 5, yPosition + 27);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${totalHT.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 7, { align: 'right' });
-      doc.text(`${tva.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 17, { align: 'right' });
-      doc.text(`${totalTTC.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 27, { align: 'right' });
-
-      // Signature (seulement si l'option est activée)
       if (options.withSignature) {
-        doc.setFont('helvetica', 'italic');
-        doc.text('SPLENDOR ART', pageWidth - margin - 40, yPosition + 60);
-        doc.text('05 Apr 1, Rue Dakar', pageWidth - margin - 40, yPosition + 67);
-        doc.text('Océan - Rabat', pageWidth - margin - 40, yPosition + 74);
-
-        // Ligne de signature
-        doc.setLineWidth(0.5);
-        doc.line(pageWidth - margin - 60, yPosition + 80, pageWidth - margin, yPosition + 65);
+        this.addSignature(doc, pageWidth, margin, yPosition, options.signatureImageUrl);
       }
     } else {
-      // Pour les BL, ajouter une mention "Bon de Livraison" et un espace pour signature de réception
-      const yPosition = 70 + facture.articles.length * 10 + 20;
-
       if (options.withSignature) {
-        doc.setFont('helvetica', 'normal');
-        doc.text('Signature et Cachet Fournisseur:', margin, yPosition + 40);
-        doc.text('SPLENDOR ART', margin + 10, yPosition + 50);
-
-        // Signature côté réception
-        doc.text('Signature et Cachet Réception:', pageWidth - margin - 60, yPosition + 40);
-        doc.rect(pageWidth - margin - 70, yPosition + 45, 60, 30);
+        this.addBlSignatureSection(doc, pageWidth, margin, yPosition, options.signatureImageUrl);
       }
     }
 
@@ -96,12 +70,143 @@ export class PdfService {
   }
 
   /**
-   * Génère un tableau d'articles dans le PDF
-   * @param doc - Le document PDF
-   * @param articles - Liste des articles
-   * @param x - Position x du tableau
-   * @param y - Position y du tableau
-   * @param hidePrices - Option pour cacher les prix (pour les BL)
+   * Ajoute l'en-tête du document avec le nom de l'entreprise
+   */
+  private addHeader(doc: jsPDF, pageWidth: number): void {
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SPLENDOR ART', pageWidth / 2, 20, { align: 'center' });
+  }
+
+  /**
+   * Ajoute les informations du client
+   */
+  private addClientInfo(doc: jsPDF, client: Client, margin: number): void {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`CLIENT: ${client.raisonSociale}`, margin, 40);
+    doc.text(`ADRESSE: ${client.ville?.nom + ' ' + client.adresse || ''}`, margin, 47);
+    doc.text(`ICE: ${client.ice || ''}`, margin, 54);
+  }
+
+  /**
+   * Ajoute les informations spécifiques au document (numéro et date)
+   */
+  private addDocumentInfo(doc: jsPDF, document: any, type: TypeDocument, pageWidth: number, margin: number): void {
+    doc.setFont('helvetica', 'bold');
+
+    const documentLabel = this.getDocumentLabel(type);
+    const documentNumber = this.getDocumentNumber(document, type);
+
+    doc.text(`${documentLabel}: N° ${documentNumber}`, pageWidth - margin, 40, { align: 'right' });
+    doc.text(`DATE: ${new Date(document.date).toLocaleDateString('fr-FR')}`, pageWidth - margin, 47, { align: 'right' });
+  }
+
+  /**
+   * Ajoute la section des totaux pour factures et devis
+   */
+  private addTotalsSection(doc: jsPDF, articles: ArticleTableFacture[], pageWidth: number, margin: number, yPosition: number): void {
+    const totalHT = articles.reduce((sum, article) => sum + article.prixTotal, 0);
+    const tva = totalHT * 0.2;
+    const totalTTC = totalHT + tva;
+
+    doc.setFillColor(240, 240, 240);
+    doc.rect(pageWidth / 2, yPosition, pageWidth / 2 - margin, 30, 'F');
+
+    doc.setFont('helvetica', 'normal');
+    doc.text('Total H.T', pageWidth / 2 + 5, yPosition + 7);
+    doc.text('T.V.A', pageWidth / 2 + 5, yPosition + 17);
+    doc.text('Total T.T.C', pageWidth / 2 + 5, yPosition + 27);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${totalHT.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 7, { align: 'right' });
+    doc.text(`${tva.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 17, { align: 'right' });
+    doc.text(`${totalTTC.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 27, { align: 'right' });
+  }
+
+  /**
+   * Ajoute la signature et les informations de l'entreprise
+   */
+  private async addSignature(doc: jsPDF, pageWidth: number, margin: number, yPosition: number, signatureImageUrl?: string): Promise<void> {
+    if (signatureImageUrl) {
+      try {
+        await this.addImageToPdf(
+          doc,
+          signatureImageUrl,
+          140,
+          yPosition + 50,
+          60,
+          30
+        );
+      } catch (error) {
+        console.error('Erreur lors du chargement de l\'image de signature:', error);
+        this.addTextSignature(doc, pageWidth, margin, yPosition);
+      }
+    } else {
+      this.addTextSignature(doc, pageWidth, margin, yPosition);
+    }
+
+    // Ligne de signature
+    doc.setLineWidth(0.5);
+    doc.line(pageWidth - margin - 60, yPosition + 80, pageWidth - margin, yPosition + 65);
+  }
+
+  /**
+   * Ajoute la signature texte (fallback)
+   */
+  private addTextSignature(doc: jsPDF, pageWidth: number, margin: number, yPosition: number): void {
+    doc.setFont('helvetica', 'italic');
+    doc.text('SPLENDOR ART', pageWidth - margin - 40, yPosition + 60);
+    doc.text('05 Apr 1, Rue Dakar', pageWidth - margin - 40, yPosition + 67);
+    doc.text('Océan - Rabat', pageWidth - margin - 40, yPosition + 74);
+  }
+
+  /**
+   * Ajoute la section de signature pour les bons de livraison
+   */
+  private async addBlSignatureSection(doc: jsPDF, pageWidth: number, margin: number, yPosition: number, signatureImageUrl?: string): Promise<void> {
+    doc.setFont('helvetica', 'normal');
+
+    if (signatureImageUrl) {
+      try {
+        // Image du fournisseur à gauche
+        await this.addImageToPdf(doc, signatureImageUrl, margin, yPosition + 40, 60, 30);
+      } catch (error) {
+        console.error('Erreur lors du chargement de l\'image de signature:', error);
+        doc.text('Signature et Cachet Fournisseur:', margin, yPosition + 40);
+        doc.text('SPLENDOR ART', margin + 10, yPosition + 50);
+      }
+    } else {
+      doc.text('Signature et Cachet Fournisseur:', margin, yPosition + 40);
+      doc.text('SPLENDOR ART', margin + 10, yPosition + 50);
+    }
+
+    // Signature côté réception
+    doc.text('Signature et Cachet Réception:', pageWidth - margin - 60, yPosition + 40);
+    doc.rect(pageWidth - margin - 70, yPosition + 45, 60, 30);
+  }
+
+  /**
+   * Méthode helper pour ajouter une image au PDF
+   */
+  private async addImageToPdf(doc: jsPDF, imageUrl: string, x: number, y: number, width: number, height: number): Promise<void> {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+
+    const reader = new FileReader();
+    return new Promise<void>((resolve, reject) => {
+      reader.onload = () => {
+        const base64data = reader.result as string;
+        doc.addImage(base64data, 'PNG', x, y, width, height);
+        resolve();
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * Génère le tableau des articles
    */
   private generateArticlesTable(doc: jsPDF, articles: ArticleTableFacture[], x: number, y: number, hidePrices: boolean = false): void {
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -117,7 +222,6 @@ export class PdfService {
     if (hidePrices) {
       // Version BL - sans prix
       doc.text('Désignation', x + 5, y + 6);
-      doc.text('Description', x + tableWidth * 0.4, y + 6);
       doc.text('Quantité', x + tableWidth * 0.8, y + 6);
     } else {
       // Version Facture/Devis - avec prix
@@ -143,7 +247,6 @@ export class PdfService {
       if (hidePrices) {
         // Version BL - sans prix
         doc.text(article.designation, x + 5, yPos + 6);
-        doc.text(article.description?.substring(0, 40) || '', x + tableWidth * 0.4, yPos + 6);
         doc.text(article.quantite.toString(), x + tableWidth * 0.8, yPos + 6);
       } else {
         // Version Facture/Devis - avec prix
@@ -154,30 +257,7 @@ export class PdfService {
       }
     });
   }
-  /**
-   * Génère un PDF à partir d'un élément HTML
-   */
-  async generatePdfFromElement(elementId: string, filename: string): Promise<Blob> {
-    const element = document.getElementById(elementId);
-    if (!element) {
-      throw new Error(`Element with ID ${elementId} not found`);
-    }
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      logging: false
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 210; // A4 width in mm
-    const imgHeight = canvas.height * imgWidth / canvas.width;
-
-    const doc = new jsPDF('p', 'mm', 'a4');
-    doc.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-
-    return doc.output('blob');
-  }
 
   /**
    * Télécharge un PDF
@@ -189,5 +269,27 @@ export class PdfService {
     link.download = filename;
     link.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Fonctions utilitaires pour obtenir des informations du document
+   */
+  private getDocumentLabel(type: TypeDocument): string {
+    return type === 'FACTURE' ? 'FACTURE' :
+      type === 'DEVIS' ? 'DEVIS' : 'BON DE LIVRAISON';
+  }
+
+  private getDocumentNumber(document: any, type: TypeDocument): string {
+    if (type === 'FACTURE') return document.numFacture;
+    if (type === 'DEVIS') return document.numDevis;
+    return document.numBl;
+  }
+
+  private getClientFromDocument(document: any): Client {
+    return document.client;
+  }
+
+  private getArticlesFromDocument(document: any): ArticleTableFacture[] {
+    return document.articles;
   }
 }

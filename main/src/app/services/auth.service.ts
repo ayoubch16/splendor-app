@@ -1,6 +1,10 @@
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
+import {BehaviorSubject, Observable} from 'rxjs';
+import {LoginRequest} from "../interfaces/entites";
+import {endpoints} from "../const/endpoints";
+import {HttpService} from "./http.service";
+import {HttpClient} from "@angular/common/http";
 
 @Injectable({
   providedIn: 'root'
@@ -9,11 +13,13 @@ export class AuthService {
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
 
-  constructor(private router: Router) {
+  constructor(private router: Router,private httpService : HttpService,private http:HttpClient) {
   }
 
 
-
+  getLogin(loginRequest: LoginRequest): Observable<any> {
+    return this.httpService.post(endpoints.user.getLogin, loginRequest)
+  }
 
 
   logout(): void {
@@ -31,10 +37,10 @@ export class AuthService {
   }
 
   isLoggedIn(): boolean {
-    return !!localStorage.getItem('authToken');
+    return !!localStorage.getItem('token');
   }
 
   getToken(): string | null {
-    return localStorage.getItem('authToken');
+    return localStorage.getItem('token');
   }
 }

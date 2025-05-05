@@ -3,6 +3,7 @@ import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/
 import {MatIcon} from "@angular/material/icon";
 import {CommonModule} from "@angular/common";
 import {MatButtonModule} from "@angular/material/button";
+import {DomSanitizer, SafeResourceUrl} from "@angular/platform-browser";
 
 @Component({
   selector: 'app-pdf-viewer-modal',
@@ -16,9 +17,8 @@ import {MatButtonModule} from "@angular/material/button";
   standalone: true,
   styleUrl: './pdf-viewer-modal.component.css'
 })
-export class PdfViewerModalComponent implements OnInit{
-
-  pdfSrc: any;
+export class PdfViewerModalComponent implements OnInit {
+  pdfSrc: SafeResourceUrl; // Changez le type en SafeResourceUrl
 
   constructor(
     public dialogRef: MatDialogRef<PdfViewerModalComponent>,
@@ -26,15 +26,16 @@ export class PdfViewerModalComponent implements OnInit{
       title: string,
       pdfBlob: Blob,
       filename: string
-    }
+    },
+    private sanitizer: DomSanitizer // Ajoutez DomSanitizer
   ) {}
 
   ngOnInit(): void {
-    // Créer une URL de l'objet blob pour l'afficher dans l'iframe
     const blobUrl = URL.createObjectURL(this.data.pdfBlob);
-    // Utiliser DomSanitizer pour permettre l'affichage de l'URL dans l'iframe
-    this.pdfSrc = blobUrl;
+    // Utilisez DomSanitizer pour marquer l'URL comme sûre
+    this.pdfSrc = this.sanitizer.bypassSecurityTrustResourceUrl(blobUrl);
   }
+
 
   closeDialog(): void {
     this.dialogRef.close();
@@ -48,12 +49,12 @@ export class PdfViewerModalComponent implements OnInit{
     link.click();
     URL.revokeObjectURL(url);
   }
-
-  ngOnDestroy(): void {
-    // Libérer l'URL lorsque le composant est détruit
-    if (this.pdfSrc) {
-      URL.revokeObjectURL(this.pdfSrc);
-    }
-  }
+  //
+  // ngOnDestroy(): void {
+  //   // Libérer l'URL lorsque le composant est détruit
+  //   if (this.pdfSrc) {
+  //     URL.revokeObjectURL(this.pdfSrc);
+  //   }
+  // }
 
 }

@@ -35,8 +35,13 @@ export const navItems: NavItem[] = [
     route: '/articles',
   },
   {
-    displayName: 'Login',
-    iconName: 'solar:lock-keyhole-minimalistic-line-duotone',
-    route: '/authentication/login',
+    displayName: 'Mon Profil',
+    iconName: 'hugeicons:user',
+    route: '/profil',
   },
+  // {
+  //   displayName: 'Login',
+  //   iconName: 'solar:lock-keyhole-minimalistic-line-duotone',
+  //   route: '/authentication/login',
+  // },
 ];

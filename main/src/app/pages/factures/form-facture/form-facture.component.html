@@ -202,24 +202,20 @@
               <button mat-menu-item (click)="editFacture(element)">
                 <mat-icon>edit</mat-icon> Modifier
               </button>
+              <button mat-menu-item (click)="changerStatut(element)">
+                <mat-icon>swap_vert</mat-icon> Changer Statut
+              </button>
               <button mat-menu-item (click)="deleteFacture(element)">
                 <mat-icon>delete</mat-icon> Supprimer
-              </button>
-              <button mat-menu-item (click)="generateBL(element)">
-                <mat-icon>request_page</mat-icon> Générer BL
               </button>
               <button mat-menu-item (click)="viewFacturePdf(element)">
                 <mat-icon>visibility</mat-icon> Consulter
               </button>
-              <button mat-menu-item (click)="downloadFacture(element)">
-                <mat-icon>download</mat-icon> Télécharger
-              </button>
-              <button mat-menu-item (click)="downloadFactureForPrint(element)">
-                <mat-icon>print</mat-icon> Télécharger pour Impression
-              </button>
-              <button mat-menu-item (click)="sendFacture(element)">
-                <mat-icon>send</mat-icon> Envoyer
-              </button>
+              <app-download-facture [facture]="element"></app-download-facture>
+              <app-download-facture-print [facture]="element"></app-download-facture-print>
+<!--              <button mat-menu-item (click)="envoyerParMail(element)">-->
+<!--                <mat-icon>email</mat-icon> Envoyer Par mail-->
+<!--              </button>-->
             </mat-menu>
           </td>
         </ng-container>

@@ -20,6 +20,9 @@ export enum Event {
   AJOUTER_CLIENT = 'AjoutClient',
   MODIFIER_CLIENT = 'ModifierClient',
   SUPPRIMER_CLIENT = 'SupprimerClient',
+  AJOUTER_USER = 'AjoutUSER',
+  MODIFIER_USER = 'ModifierUSER',
+  SUPPRIMER_USER = 'SupprimerUSER',
 
 
 

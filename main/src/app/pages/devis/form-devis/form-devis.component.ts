@@ -1,16 +1,14 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from "@angular/forms";
-import { MatAutocompleteSelectedEvent, MatAutocompleteModule } from "@angular/material/autocomplete";
-import {MatDialog, MatDialogActions} from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { BehaviorSubject, Observable, map, startWith } from "rxjs";
+import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from "@angular/material/autocomplete";
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { BehaviorSubject, map, Observable, startWith } from "rxjs";
 import { finalize } from 'rxjs/operators';
 
-import { Article, ArticleTable, Client, Devis, StatutDevis } from "../../../interfaces/entites";
+import { Article, ArticleTable, Client, Devis, StatutDevis, TypeDocument } from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
 import { FormArticleComponent } from "../../articles/form-article/form-article.component";
-
-// Import des modules Angular Material
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatSelectModule } from "@angular/material/select";
 import { MatButtonModule } from "@angular/material/button";
@@ -20,8 +18,16 @@ import { MatTableModule } from "@angular/material/table";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatSpinner } from "@angular/material/progress-spinner";
+import {MatProgressSpinner, MatSpinner} from "@angular/material/progress-spinner";
+import { EventBusService } from "../../../services/event-bus.service";
+import { Event } from "../../../interfaces/EmitEvent";
+import { DownloadDevisComponent } from "../download-devis/download-devis.component";
+import { DownloadDevisPrintComponent } from "../download-devis-print/download-devis-print.component";
+import { PdfService } from "../../../services/pdf.service";
+import { ChangeStatusComponent } from "../../../components/change-status/change-status.component";
+import { SendEmailComponent } from "../../../components/send-email/send-email.component";
+import { PdfViewerModalComponent } from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
+import { ConfirmationModalComponent } from "../../../components/confirmation-modal/confirmation-modal.component";
 
 @Component({
   selector: 'app-form-devis',
@@ -40,38 +46,35 @@ import { MatSpinner } from "@angular/material/progress-spinner";
     MatMenuModule,
     MatSnackBarModule,
     MatSpinner,
-    MatAutocompleteModule
+    MatAutocompleteModule,
+    DownloadDevisComponent,
+    DownloadDevisPrintComponent,
+    MatProgressSpinner
   ],
   templateUrl: './form-devis.component.html',
   styleUrls: ['./form-devis.component.scss']
 })
 export class FormDevisComponent implements OnInit {
-  // Déclaration des données
   clients: Client[] = [];
   listeArticle: Article[] = [];
   listeDevis: Devis[] = [];
 
-  // Observable pour la liste des articles
   private articlesSubject = new BehaviorSubject<ArticleTable[]>([]);
   articles$: Observable<ArticleTable[]> = this.articlesSubject.asObservable();
 
-  // Filtres pour les autocomplétion
   clientFilterCtrl = new FormControl();
   articleFilterCtrl = new FormControl();
   filteredClients: Client[] = [];
   filteredArticles: Article[] = [];
 
-  // Sélections courantes
   selectedClient: Client | null = null;
   selectedArticle: Article | null = null;
   selectedClientId: number | null = null;
   selectedArticleId: number | null = null;
 
-  // Configuration des tables
   colonnesAffichees: string[] = ['#', 'designation', 'description', 'category', 'quantite', 'prixUnitaire', 'prixTotal', 'actions'];
   displayedColumns2: string[] = ['numDevis', 'clientName', 'montant', 'statut', 'date', 'menu'];
 
-  // Données du formulaire
   nouvelArticle: ArticleTable = this.initialiserNouvelArticle();
   totalHT = 0;
   tva = 0;
@@ -80,7 +83,6 @@ export class FormDevisComponent implements OnInit {
   devisNumber = '';
   currentDevisId: number | null = null;
 
-  // États
   modeEdition = false;
   articleEnEditionIndex = -1;
   isLoading = false;
@@ -90,33 +92,30 @@ export class FormDevisComponent implements OnInit {
   constructor(
     private dataService: DataService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private eventBusService: EventBusService,
+    private pdfService: PdfService
   ) { }
 
-  // Getter pour faciliter l'accès à la liste des articles
   get articles(): ArticleTable[] {
     return this.articlesSubject.value;
   }
 
   ngOnInit(): void {
-    this.initialiserFormulaire();
     this.configurerSubscriptions();
     this.chargerDonnees();
-  }
-
-  // Méthodes d'initialisation
-  private initialiserFormulaire(): void {
-    this.devisNumber = this.generateDocumentNumber();
+    this.loadArticles();
+    this.eventBusService.onObserver([Event.AJOUTER_ARTICLE]).subscribe(
+      () => this.loadArticles()
+    );
   }
 
   private configurerSubscriptions(): void {
-    // Observer les changements de la liste d'articles
     this.articles$.subscribe(articles => {
       this.calculerTotaux();
       this.articlesChanged.emit(articles);
     });
 
-    // Configurer les filtres d'autocomplétion
     this.clientFilterCtrl.valueChanges
       .pipe(
         startWith(''),
@@ -138,10 +137,8 @@ export class FormDevisComponent implements OnInit {
       });
   }
 
-  // Méthodes de chargement des données
   private chargerDonnees(): void {
     this.loadClients();
-    this.loadArticles();
     this.loadDevis();
   }
 
@@ -165,14 +162,13 @@ export class FormDevisComponent implements OnInit {
 
   loadDevis(): void {
     this.isLoading = true;
-    this.dataService.getDevis().pipe(
+    this.dataService.getAllDevis().pipe(
       finalize(() => this.isLoading = false)
     ).subscribe(devis => {
       this.listeDevis = devis;
     });
   }
 
-  // Méthodes de filtrage
   private _filterArticles(value: string): Article[] {
     const filterValue = value.toLowerCase();
     return this.listeArticle.filter(article =>
@@ -187,7 +183,6 @@ export class FormDevisComponent implements OnInit {
     );
   }
 
-  // Méthodes de traitement des sélections
   onClientSelected(event: MatAutocompleteSelectedEvent): void {
     this.selectedClient = event.option.value;
     this.selectedClientId = this.selectedClient?.id || null;
@@ -205,7 +200,6 @@ export class FormDevisComponent implements OnInit {
     }
   }
 
-  // Méthodes d'affichage pour les autocomplete
   displayClient(client?: Client): string {
     return client ? client.raisonSociale : '';
   }
@@ -214,7 +208,6 @@ export class FormDevisComponent implements OnInit {
     return article ? article.nameArticle : '';
   }
 
-  // Gestion des articles
   initialiserNouvelArticle(): ArticleTable {
     return {
       designation: '',
@@ -229,26 +222,25 @@ export class FormDevisComponent implements OnInit {
     this.nouvelArticle.prixTotal = this.nouvelArticle.quantite * this.nouvelArticle.prixUnitaire;
   }
 
-  /**
-   * Ajoute ou modifie un article dans la liste après confirmation
-   */
-  ajouterArticle(): void {
+  async ajouterArticle(): Promise<void> {
     if (!this.nouvelArticle.designation || !this.nouvelArticle.quantite || !this.nouvelArticle.prixUnitaire) {
       this.showErrorMessage('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
-    // Message de confirmation différent selon le mode (ajout ou modification)
     const message = this.modeEdition
-      ? `Êtes-vous sûr de vouloir modifier l'article "${this.nouvelArticle.designation}" ?`
-      : `Êtes-vous sûr de vouloir ajouter l'article "${this.nouvelArticle.designation}" au devis ?`;
+      ? `Voulez-vous modifier l'article "${this.nouvelArticle.designation}" ?`
+      : `Voulez-vous ajouter l'article "${this.nouvelArticle.designation}" au devis ?`;
 
-    // Demander confirmation avant d'ajouter ou modifier
-    if (confirm(message)) {
+    const confirmed = await this.openConfirmationDialog(
+      this.modeEdition ? 'Modifier article' : 'Ajouter article',
+      message
+    );
+
+    if (confirmed) {
       const currentArticles = this.articlesSubject.value;
 
       if (this.modeEdition && this.articleEnEditionIndex >= 0) {
-        // Mode modification
         const updatedArticles = [...currentArticles];
         updatedArticles[this.articleEnEditionIndex] = { ...this.nouvelArticle };
         this.articlesSubject.next(updatedArticles);
@@ -256,32 +248,29 @@ export class FormDevisComponent implements OnInit {
         this.articleEnEditionIndex = -1;
         this.showSuccessMessage(`Article "${this.nouvelArticle.designation}" modifié avec succès`);
       } else {
-        // Mode ajout
         this.articlesSubject.next([...currentArticles, { ...this.nouvelArticle }]);
         this.showSuccessMessage(`Article "${this.nouvelArticle.designation}" ajouté avec succès`);
       }
 
-      // Réinitialiser le formulaire après ajout
       this.nouvelArticle = this.initialiserNouvelArticle();
       this.articleFilterCtrl.setValue('');
       this.selectedArticle = null;
     }
   }
 
-  /**
-   * Supprime un article de la liste après confirmation
-   * @param index Index de l'article à supprimer
-   */
-  supprimerArticle(index: number): void {
+  async supprimerArticle(index: number): Promise<void> {
     const articleASupprimer = this.articlesSubject.value[index];
+    const confirmed = await this.openConfirmationDialog(
+      'Supprimer article',
+      `Voulez-vous supprimer l'article "${articleASupprimer.designation}" ?`
+    );
 
-    if (confirm(`Êtes-vous sûr de vouloir supprimer l'article "${articleASupprimer.designation}" ?`)) {
+    if (confirmed) {
       const currentArticles = this.articlesSubject.value;
       const updatedArticles = currentArticles.filter((_, i) => i !== index);
       this.articlesSubject.next(updatedArticles);
       this.showSuccessMessage(`Article "${articleASupprimer.designation}" supprimé avec succès`);
 
-      // Si l'article en cours d'édition est supprimé, réinitialiser le formulaire
       if (this.modeEdition && this.articleEnEditionIndex === index) {
         this.nouvelArticle = this.initialiserNouvelArticle();
         this.modeEdition = false;
@@ -290,16 +279,11 @@ export class FormDevisComponent implements OnInit {
     }
   }
 
-  /**
-   * Prépare la modification d'un article
-   * @param index Index de l'article à modifier
-   */
   modifierArticle(index: number): void {
     this.modeEdition = true;
     this.articleEnEditionIndex = index;
     this.nouvelArticle = { ...this.articlesSubject.value[index] };
 
-    // Faire défiler jusqu'au formulaire d'édition
     const formElement = document.querySelector('.article-table-container');
     if (formElement) {
       formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -313,21 +297,7 @@ export class FormDevisComponent implements OnInit {
     this.totalTTC = this.totalHT + this.tva;
   }
 
-  // Gestion des devis
-  private generateDocumentNumber(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const random = Math.floor(100 + Math.random() * 900);
-    const prefix = 'DEV';
-    return `${prefix}-${year}${month}${day}-${random}`;
-  }
-
-  /**
-   * Enregistre un nouveau devis ou met à jour un devis existant après confirmation
-   */
-  enregistrerDevis(): void {
+  async enregistrerDevis(): Promise<void> {
     if (!this.selectedClientId || this.articles.length === 0) {
       this.showErrorMessage('Veuillez sélectionner un client et ajouter au moins un article');
       return;
@@ -339,110 +309,116 @@ export class FormDevisComponent implements OnInit {
       return;
     }
 
-    // Message de confirmation différent selon qu'il s'agit d'un ajout ou d'une modification
     const confirmMessage = this.currentDevisId
-      ? `Êtes-vous sûr de vouloir modifier le devis ${this.devisNumber} ?`
-      : `Êtes-vous sûr de vouloir enregistrer ce nouveau devis pour ${client.raisonSociale} ?`;
+      ? `Voulez-vous modifier le devis ${this.devisNumber} ?`
+      : `Voulez-vous enregistrer ce nouveau devis pour ${client.raisonSociale} ?`;
 
-    if (confirm(confirmMessage)) {
-      this.isLoading = true;
-      const devis: Devis = {
-        id: this.currentDevisId || 0,
-        numDevis: this.devisNumber,
-        client: client,
-        montant: this.totalTTC.toFixed(2),
-        statut: StatutDevis.EN_ATTENTE,
-        date: this.devisDate,
-        articles: this.articles.map(article => ({
-          designation: article.designation,
-          description: article.description,
-          quantite: article.quantite,
-          prixUnitaire: article.prixUnitaire,
-          prixTotal: article.prixTotal
-        }))
-      };
+    const confirmed = await this.openConfirmationDialog(
+      this.currentDevisId ? 'Modifier devis' : 'Créer devis',
+      confirmMessage
+    );
 
-      const operation$ = this.currentDevisId
-        ? this.dataService.updateDevis(devis)
-        : this.dataService.addDevis(devis);
+    if (!confirmed) return;
 
-      operation$.pipe(
-        finalize(() => this.isLoading = false)
-      ).subscribe({
-        next: () => {
-          this.showSuccessMessage(`Devis ${this.currentDevisId ? 'modifié' : 'ajouté'} avec succès`);
-          this.resetForm();
-          this.loadDevis();
-        },
-        error: (error) => {
-          this.showErrorMessage(`Erreur: ${error.message || 'Opération échouée'}`);
-        }
-      });
-    }
-  }
+    this.isLoading = true;
 
-  /**
-   * Charge un devis existant pour modification
-   * @param devis Devis à modifier
-   */
-  editDevis(devis: Devis): void {
-    // Demander confirmation avant de charger le devis pour modification
-    if (confirm(`Êtes-vous sûr de vouloir modifier le devis ${devis.numDevis} ?`)) {
-      this.currentDevisId = devis.id;
-      this.selectedClientId = devis.client.id;
-      this.selectedClient = devis.client;
-      this.devisDate = devis.date;
-      this.devisNumber = devis.numDevis;
 
-      // Mettre à jour le champ d'autocomplétion
-      this.clientFilterCtrl.setValue(devis.client);
 
-      const articles: ArticleTable[] = devis.articles.map(article => ({
+    const devis: Devis = {
+      id: this.currentDevisId || undefined,
+      numDevis: this.devisNumber,
+      client: client,
+      montant: this.totalTTC.toFixed(2),
+      statut: StatutDevis.EN_ATTENTE,
+      date: this.devisDate,
+      articles: this.articles.map(article => ({
         designation: article.designation,
         description: article.description,
         quantite: article.quantite,
         prixUnitaire: article.prixUnitaire,
         prixTotal: article.prixTotal
-      }));
+      }))
+    };
 
-      this.articlesSubject.next(articles);
-      this.scrollToForm();
-    }
-  }
+    const operation$ = this.currentDevisId
+      ? this.dataService.updateDevis(this.currentDevisId, devis)
+      : this.dataService.createDevis(devis);
 
-  /**
-   * Supprime un devis existant après confirmation
-   * @param devis Devis à supprimer
-   */
-  deleteDevis(devis: Devis): void {
-    if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement le devis ${devis.numDevis} pour ${devis.client.raisonSociale} ?`)) {
-      this.isLoading = true;
-      this.dataService.deleteDevis(devis.id).pipe(
-        finalize(() => this.isLoading = false)
-      ).subscribe({
-        next: () => {
-          this.showSuccessMessage(`Devis ${devis.numDevis} supprimé avec succès`);
-          this.loadDevis();
-          if (this.currentDevisId === devis.id) {
-            this.resetForm();
-          }
-        },
-        error: (error) => {
-          this.showErrorMessage(`Erreur lors de la suppression: ${error.message || 'Opération échouée'}`);
-        }
-      });
-    }
-  }
-
-  /**
-   * Réinitialise le formulaire après confirmation
-   */
-  resetForm(): void {
-    // Si le formulaire contient des données, demander confirmation
-    if (this.selectedClientId || this.articles.length > 0) {
-      if (!confirm('Êtes-vous sûr de vouloir annuler ? Toutes les modifications non enregistrées seront perdues.')) {
-        return;
+    operation$.pipe(
+      finalize(() => this.isLoading = false)
+    ).subscribe({
+      next: () => {
+        this.showSuccessMessage(`Devis ${this.currentDevisId ? 'modifié' : 'ajouté'} avec succès`);
+        this.resetForm();
+        this.loadDevis();
+      },
+      error: (error) => {
+        this.showErrorMessage(`Erreur: ${error.message || 'Opération échouée'}`);
       }
+    });
+  }
+
+  async editDevis(devis: Devis): Promise<void> {
+    const confirmed = await this.openConfirmationDialog(
+      'Modifier devis',
+      `Voulez-vous modifier le devis ${devis.numDevis} ?`
+    );
+
+    if (!confirmed) return;
+
+    this.currentDevisId = devis.id || null;
+    this.selectedClient = devis.client;
+    this.selectedClientId = devis.client.id;
+    this.clientFilterCtrl.setValue(devis.client.raisonSociale);
+    this.devisDate = devis.date;
+    this.devisNumber = devis.numDevis;
+
+    const articles: ArticleTable[] = devis.articles.map(article => ({
+      designation: article.designation,
+      description: article.description,
+      quantite: article.quantite,
+      prixUnitaire: article.prixUnitaire,
+      prixTotal: article.prixTotal
+    }));
+
+    this.articlesSubject.next(articles);
+    this.calculerTotaux();
+    this.scrollToForm();
+  }
+
+  async deleteDevis(devis: Devis): Promise<void> {
+    const confirmed = await this.openConfirmationDialog(
+      'Supprimer devis',
+      `Voulez-vous supprimer définitivement le devis ${devis.numDevis} pour ${devis.client.raisonSociale} ?`
+    );
+
+    if (!confirmed) return;
+
+    this.isLoading = true;
+    this.dataService.deleteDevis(devis.id!).pipe(
+      finalize(() => this.isLoading = false)
+    ).subscribe({
+      next: () => {
+        this.showSuccessMessage(`Devis ${devis.numDevis} supprimé avec succès`);
+        this.loadDevis();
+        if (this.currentDevisId === devis.id) {
+          this.resetForm();
+        }
+      },
+      error: (error) => {
+        this.showErrorMessage(`Erreur lors de la suppression: ${error.message || 'Opération échouée'}`);
+      }
+    });
+  }
+
+  async resetForm(): Promise<void> {
+    if (this.selectedClientId || this.articles.length > 0) {
+      const confirmed = await this.openConfirmationDialog(
+        'Annuler modifications',
+        'Voulez-vous annuler ? Toutes les modifications non enregistrées seront perdues.'
+      );
+
+      if (!confirmed) return;
     }
 
     this.selectedClientId = null;
@@ -450,7 +426,6 @@ export class FormDevisComponent implements OnInit {
     this.clientFilterCtrl.setValue('');
     this.articleFilterCtrl.setValue('');
     this.devisDate = new Date().toISOString().split('T')[0];
-    this.devisNumber = this.generateDocumentNumber();
     this.articlesSubject.next([]);
     this.currentDevisId = null;
     this.nouvelArticle = this.initialiserNouvelArticle();
@@ -466,17 +441,16 @@ export class FormDevisComponent implements OnInit {
     const dialogRef = this.dialog.open(FormArticleComponent, {
       width: '800px',
       data: {},
-      disableClose: true, // Désactive la fermeture en cliquant à l'extérieur ou ESC
+      disableClose: true,
       hasBackdrop: true,
       panelClass: 'custom-dialog-container'
     });
 
-    // Créez un bouton de fermeture personnalisé dans la modale
     const closeButton = document.createElement('button');
     closeButton.innerHTML = '&times;';
     closeButton.className = 'custom-close-button';
     closeButton.onclick = () => dialogRef.close();
-    // Ajoutez le bouton à la modale
+
     dialogRef.afterOpened().subscribe(() => {
       const dialogContainer = document.querySelector('.custom-dialog-container');
       if (dialogContainer) {
@@ -488,7 +462,6 @@ export class FormDevisComponent implements OnInit {
       if (result) {
         this.loadArticles();
       }
-      // Nettoie le bouton lorsque la modale est fermée
       if (closeButton.parentNode) {
         closeButton.parentNode.removeChild(closeButton);
       }
@@ -502,7 +475,6 @@ export class FormDevisComponent implements OnInit {
     }
   }
 
-  // Gestion des notifications
   private showSuccessMessage(message: string): void {
     this.snackBar.open(message, 'Fermer', {
       duration: 3000,
@@ -516,4 +488,179 @@ export class FormDevisComponent implements OnInit {
       panelClass: ['error-snackbar']
     });
   }
+
+  consulterDevis(devis: Devis): void {
+    this.isLoading = true;
+    this.pdfService.generatePdf(devis)
+      .then(blob => {
+        this.dialog.open(PdfViewerModalComponent, {
+          width: '90%',
+          maxWidth: '1000px',
+          data: {
+            title: `Devis ${devis.numDevis}`,
+            pdfBlob: blob,
+            filename: `Devis_${devis.numDevis}.pdf`
+          }
+        });
+        this.isLoading = false;
+      })
+      .catch(error => {
+        this.showErrorMessage('Erreur lors de la génération du PDF');
+        this.isLoading = false;
+        console.error(error);
+      });
+  }
+
+  changerStatut(devis: Devis): void {
+    const dialogRef = this.dialog.open(ChangeStatusComponent, {
+      width: '400px',
+      data: { currentStatus: devis.statut, devisId: devis.id!, documentType: TypeDocument.DEVIS }
+    });
+
+    dialogRef.afterClosed().subscribe(newStatus => {
+      if (newStatus) {
+        this.isLoading = true;
+        this.dataService.updateDevisStatut(devis.id!, newStatus)
+          .pipe(finalize(() => this.isLoading = false))
+          .subscribe({
+            next: () => {
+              this.showSuccessMessage('Statut mis à jour avec succès');
+              this.loadDevis();
+            },
+            error: (error) => {
+              this.showErrorMessage(`Erreur: ${error.message}`);
+            }
+          });
+      }
+    });
+  }
+
+  async genererFacture(devis: Devis): Promise<void> {
+    const factureDejaExistante = await this.factureExists(devis);
+
+    if (factureDejaExistante) {
+      const numFact = devis.numDevis.replace('DEV', 'FACT');
+      const confirmerNouvelleFacture = await this.openConfirmationDialog(
+        'Facture existante',
+        `Une facture existe déjà pour ce devis (${numFact}). Voulez-vous quand même créer une nouvelle facture?`
+      );
+
+      if (!confirmerNouvelleFacture) {
+        return;
+      }
+    }
+
+    const confirmed = await this.openConfirmationDialog(
+      'Générer facture',
+      `Voulez-vous générer une facture à partir du devis ${devis.numDevis} ?`
+    );
+
+    if (confirmed) {
+      this.isLoading = true;
+      this.dataService.createFacture(devis.id!)
+        .pipe(finalize(() => this.isLoading = false))
+        .subscribe({
+          next: () => {
+            this.showSuccessMessage('Facture générée avec succès');
+            this.loadDevis();
+          },
+          error: (error) => {
+            this.showErrorMessage(`Erreur: ${error.message}`);
+          }
+        });
+    }
+  }
+
+  factureExists(devis: Devis): Promise<boolean> {
+    return new Promise((resolve) => {
+      const numFact = devis.numDevis.replace('DEV', 'FACT');
+      this.dataService.checkFacture(numFact).subscribe({
+        next: (result) => resolve(result),
+        error: () => resolve(false)
+      });
+    });
+  }
+
+  envoyerParMail(devis: Devis): void {
+    const dialogRef = this.dialog.open(SendEmailComponent, {
+      width: '600px',
+      data: {
+        documentId: devis.id!,
+        documentNumber: devis.numDevis,
+        clientEmail: devis.client?.email,
+        typeDocument: TypeDocument.DEVIS
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(resultEmail => {
+      if (resultEmail) {
+        this.isLoading = true;
+        this.dataService.sendDevisByEmail(devis.id!)
+          .pipe(finalize(() => this.isLoading = false))
+          .subscribe({
+            next: () => {
+              this.showSuccessMessage('Email envoyé avec succès');
+            },
+            error: (error) => {
+              this.showErrorMessage(`Erreur: ${error.message}`);
+            }
+          });
+      }
+    });
+  }
+
+  async genererBonLivraison(devis: Devis): Promise<void> {
+    const blDejaExistant = await this.bonLivraisonExists(devis);
+
+    if (blDejaExistant) {
+      const numBL = devis.numDevis.replace('DEV', 'BL');
+      const confirmerNouveauBL = await this.openConfirmationDialog(
+        'Bon de livraison existant',
+        `Un bon de livraison existe déjà pour ce devis (${numBL}). Voulez-vous quand même créer un nouveau bon de livraison?`
+      );
+
+      if (!confirmerNouveauBL) {
+        return;
+      }
+    }
+
+    const confirmed = await this.openConfirmationDialog(
+      'Générer bon de livraison',
+      `Voulez-vous générer un bon de livraison à partir du devis ${devis.numDevis} ?`
+    );
+
+    if (confirmed) {
+      this.isLoading = true;
+      this.dataService.createBl(devis.id!)
+        .pipe(finalize(() => this.isLoading = false))
+        .subscribe({
+          next: () => {
+            this.showSuccessMessage('Bon de livraison généré avec succès');
+            this.loadDevis();
+          },
+          error: (error) => {
+            this.showErrorMessage(`Erreur: ${error.message}`);
+          }
+        });
+    }
+  }
+
+  bonLivraisonExists(devis: Devis): Promise<boolean> {
+    return new Promise((resolve) => {
+      const numBL = devis.numDevis.replace('DEV', 'BL');
+      this.dataService.checkBonLivraison(numBL).subscribe({
+        next: (result) => resolve(result),
+        error: () => resolve(false)
+      });
+    });
+  }
+
+  private openConfirmationDialog(title: string, message: string): Promise<boolean> {
+    const dialogRef = this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: { title, message }
+    });
+    return dialogRef.afterClosed().toPromise();
+  }
+
 }

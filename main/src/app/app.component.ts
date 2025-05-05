@@ -9,7 +9,6 @@ import {AuthService} from "./services/auth.service";
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit {
-  title = 'u111685381_splendorart';
 
   constructor(
     private authService: AuthService,
@@ -18,10 +17,10 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     console.log("isLoggedIn :"+this.authService.isLoggedIn())
-    // if (this.authService.isLoggedIn()) {
-    //   this.router.navigate(['/']);
-    // } else {
-    //   this.router.navigate(['/authentication/login']);
-    // }
+
+    if (!this.authService.isLoggedIn()){
+      this.router.navigate(['/authentication/login']);
+    }
+
   }
 }

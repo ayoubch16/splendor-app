@@ -172,18 +172,23 @@
               <mat-icon>more_vert</mat-icon>
             </button>
             <mat-menu #menu="matMenu" xPosition="before">
+              <button mat-menu-item (click)="consulterBl(element)">
+                <mat-icon>visibility</mat-icon> Consulter
+              </button>
               <button mat-menu-item (click)="editBl(element)">
                 <mat-icon>edit</mat-icon> Modifier
               </button>
               <button mat-menu-item (click)="deleteBl(element)">
                 <mat-icon>delete</mat-icon> Supprimer
               </button>
-              <button mat-menu-item>
-                <mat-icon>download</mat-icon> Télécharger
+              <button mat-menu-item (click)="changerStatut(element)">
+                <mat-icon>swap_vert</mat-icon> Changer Statut
               </button>
-              <button mat-menu-item>
-                <mat-icon>print</mat-icon> Télécharger pour Impression
-              </button>
+              <app-download-bl [bl]="element"></app-download-bl>
+              <app-download-bl-print [bl]="element"></app-download-bl-print>
+<!--              <button mat-menu-item (click)="envoyerParMail(element)">-->
+<!--                <mat-icon>email</mat-icon> Envoyer Par mail-->
+<!--              </button>-->
             </mat-menu>
           </td>
         </ng-container>

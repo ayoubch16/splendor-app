@@ -4,14 +4,22 @@ import { MatTableModule } from '@angular/material/table';
 import { MatMenuModule } from '@angular/material/menu';
 import { CommonModule, DatePipe } from '@angular/common';
 import {DataService} from "../../services/data.service";
-import {Observable} from "rxjs";
+import {map, Observable} from "rxjs";
 import {Bl, Devis, Facture} from "../../interfaces/entites";
+import {
+  DownloadFacturePrintComponent
+} from "../../pages/factures/download-facture-print/download-facture-print.component";
+import {DownloadFactureComponent} from "../../pages/factures/download-facture/download-facture.component";
+import {DownloadBlPrintComponent} from "../../pages/bl/download-bl-print/download-bl-print.component";
+import {DownloadBlComponent} from "../../pages/bl/download-bl/download-bl.component";
+import {DownloadDevisPrintComponent} from "../../pages/devis/download-devis-print/download-devis-print.component";
+import {DownloadDevisComponent} from "../../pages/devis/download-devis/download-devis.component";
 
 
 @Component({
   selector: 'app-derniers-fichiers',
   standalone: true,
-  imports: [MaterialModule, MatTableModule, MatMenuModule, CommonModule, DatePipe],
+  imports: [MaterialModule, MatTableModule, MatMenuModule, CommonModule, DatePipe, DownloadFacturePrintComponent, DownloadFactureComponent, DownloadBlPrintComponent, DownloadBlComponent, DownloadDevisPrintComponent, DownloadDevisComponent],
   templateUrl: './derniers-fichiers.component.html'
 })
 export class DerniersFichiersComponent implements OnInit {
@@ -65,8 +73,10 @@ export class DerniersFichiersComponent implements OnInit {
     return this.dataService.getFactures()
   }
 
-   getSampleDevis(): Observable<Devis[]>  {
-    return this.dataService.getDevis()
+  getSampleDevis(): Observable<Devis[]> {
+    return this.dataService.getAllDevis().pipe(
+      map(devisList => devisList.slice(0, 5))
+    );
   }
 
   private getSampleBL(): Observable<Bl[]>  {

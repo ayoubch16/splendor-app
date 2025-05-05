@@ -1,7 +1,6 @@
 import {Component, OnInit} from '@angular/core';
 import {ReactiveFormsModule} from "@angular/forms";
 import {Article} from "../../../interfaces/entites";
-import {Observable} from "rxjs";
 import {DataService} from "../../../services/data.service";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
@@ -14,6 +13,8 @@ import {MatIconModule} from "@angular/material/icon";
 import {MatTooltipModule} from "@angular/material/tooltip";
 import {EventBusService} from "../../../services/event-bus.service";
 import {Event} from "../../../interfaces/EmitEvent";
+import {ConfirmationModalComponent} from "../../../components/confirmation-modal/confirmation-modal.component";
+import {MatDialog} from "@angular/material/dialog";
 
 @Component({
   selector: 'app-list-article',
@@ -34,10 +35,12 @@ import {Event} from "../../../interfaces/EmitEvent";
 })
 export class ListArticleComponent implements OnInit {
   articles: Article[] = [];
-  listearticles: Observable<Article[]>;
+  listearticles: Article[];
   displayedColumns: string[] = ['nameArticle', 'unite', 'category', 'price', 'description', 'actions'];
 
-  constructor(private dataService: DataService,private eventBusService: EventBusService) {
+  constructor(private dataService: DataService,
+              private eventBusService: EventBusService,
+              private dialog: MatDialog) {
 
   }
 
@@ -46,9 +49,13 @@ export class ListArticleComponent implements OnInit {
   }
 
   loadArticles(): void {
-    this.listearticles = this.dataService.getArticles();
-    this.eventBusService.onObserver([Event.MODIFIER_ARTICLE]).subscribe(
-      ()=>this.listearticles = this.dataService.getArticles())
+    this.dataService.getArticles().subscribe(
+      (article => this.listearticles = article)
+    );
+    this.eventBusService.onObserver([Event.AJOUTER_ARTICLE]).subscribe(
+      ()=>this.dataService.getArticles().subscribe(
+        (article => this.listearticles = article)
+      ))
   }
 
 
@@ -58,11 +65,25 @@ export class ListArticleComponent implements OnInit {
   }
 
   deleteArticle(articleId: number): void {
-    const index = this.articles.findIndex(a => a.id === articleId);
-    if (index !== -1) {
-      this.articles.splice(index, 1);
-      console.log('Article supprimé:', articleId);
-    }
+
+
+    const dialogRef = this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: {
+        title: 'Supprimer article',
+        message: 'Êtes-vous sûr de vouloir supprimer cet article ?',
+        confirmText: 'Confirmer',
+        cancelText: 'Annuler'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataService.deleteArticle(articleId).subscribe(
+          ()=>    this.eventBusService.emit<Article>(Event.AJOUTER_ARTICLE)
+        )
+      }
+    });
   }
 
 }

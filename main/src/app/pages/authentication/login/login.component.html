@@ -1,40 +1,32 @@
-<div class="blank-layout-container justify-content-center align-items-center bg-light">
-  <div class="position-relative row w-100 h-100 bg-gredient justify-content-center">
-    <div class="col-lg-4 d-flex align-items-center">
-      <mat-card class="cardWithShadow boxed-auth">
-        <mat-card-content class="p-32">
-          <div class="text-center">
-            <a>
-              <img src="./assets/images/logos/splendorart-logo.png" width="200px" class="align-middle m-2" alt="logo" />
-            </a>
-          </div>
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>
+      <img src="assets/images/logos/splendorart-logo.png" alt="splendorart logo" width="250px">
+    </mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+      <mat-form-field appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput formControlName="email" type="email">
+        <mat-error *ngIf="f['email'].errors?.['required']">Email est requis</mat-error>
+        <mat-error *ngIf="f['email'].errors?.['email']">Email invalide</mat-error>
+      </mat-form-field>
 
-          <form class="m-t-30" [formGroup]="loginForm" (ngSubmit)="onSubmit()">
-            <!-- Email -->
-            <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Email</mat-label>
-            <mat-form-field appearance="outline" class="w-100" color="primary">
-              <input matInput formControlName="email" type="email" placeholder="Email" />
-              <mat-error *ngIf="loginForm.get('email')?.errors?.['required']">Email est requis</mat-error>
-              <mat-error *ngIf="loginForm.get('email')?.errors?.['email']">Veuillez entrer un email valide</mat-error>
-            </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Mot de passe</mat-label>
+        <input matInput formControlName="password" type="password">
+        <mat-error *ngIf="f['password'].errors?.['required']">Mot de passe est requis</mat-error>
+      </mat-form-field>
 
-            <!-- Password -->
-            <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Mot de passe</mat-label>
-            <mat-form-field appearance="outline" class="w-100" color="primary">
-              <input matInput formControlName="password" type="password" placeholder="Mot de passe" />
-              <mat-error *ngIf="loginForm.get('password')?.errors?.['required']">Mot de passe est requis</mat-error>
-              <mat-error *ngIf="loginForm.get('password')?.errors?.['minlength']">Le mot de passe doit contenir au moins 8 caractères</mat-error>
-            </mat-form-field>
+      <div *ngIf="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
 
-            <button mat-flat-button color="primary" type="submit" [disabled]="loginForm.invalid || submitted">
-              <span *ngIf="!submitted">Se connecter</span>
-              <span *ngIf="submitted">
-                <mat-spinner diameter="20" color="accent"></mat-spinner>
-              </span>
-            </button>
-          </form>
-        </mat-card-content>
-      </mat-card>
-    </div>
-  </div>
-</div>
+      <button mat-raised-button color="primary" type="submit" [disabled]="isLoading">
+        <span *ngIf="!isLoading">Se connecter</span>
+        <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+      </button>
+    </form>
+  </mat-card-content>
+</mat-card>

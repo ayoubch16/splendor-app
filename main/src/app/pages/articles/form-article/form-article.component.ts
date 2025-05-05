@@ -9,11 +9,13 @@ import {CommonModule} from "@angular/common";
 import {MatTableModule} from "@angular/material/table";
 import {MatIconModule} from "@angular/material/icon";
 import {MatTooltipModule} from "@angular/material/tooltip";
+import {MatDialog, MatDialogModule} from "@angular/material/dialog";
 import {Article, CategoryArticle} from "../../../interfaces/entites";
 import {Observable} from "rxjs";
 import {DataService} from "../../../services/data.service";
 import {EventBusService} from "../../../services/event-bus.service";
 import {Event} from "../../../interfaces/EmitEvent";
+import {ConfirmationModalComponent} from "../../../components/confirmation-modal/confirmation-modal.component";
 
 @Component({
   selector: 'app-form-article',
@@ -27,7 +29,8 @@ import {Event} from "../../../interfaces/EmitEvent";
     CommonModule,
     MatTableModule,
     MatIconModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatDialogModule
   ],
   standalone: true,
   templateUrl: './form-article.component.html'
@@ -39,13 +42,15 @@ export class FormArticleComponent implements OnInit {
   isEditMode = false;
   currentArticleId: number | null = null;
 
-  constructor(private fb: FormBuilder,
-              private dataService: DataService,
-              private eventBusService: EventBusService,
-                ) {
+  constructor(
+    private fb: FormBuilder,
+    private dataService: DataService,
+    private eventBusService: EventBusService,
+    private dialog: MatDialog
+  ) {
     this.articleForm = this.fb.group({
       nameArticle: ['', Validators.required],
-      unite: ['', Validators.required],
+      unite: [''],
       categoryArticle: [null, Validators.required],
       descriptionArticle: [''],
       priceArticle: [0, [Validators.required, Validators.min(0)]]
@@ -69,37 +74,70 @@ export class FormArticleComponent implements OnInit {
     this.categories = this.dataService.getCategories();
   }
 
-
   onSubmit(): void {
     if (this.articleForm.valid) {
-      const articleData: Article = {
-        id: this.isEditMode && this.currentArticleId ? this.currentArticleId : this.generateId(),
-        ...this.articleForm.value
-      };
-
-      if (this.isEditMode) {
-        // Mettre à jour l'article
-        const index = this.articles.findIndex(a => a.id === this.currentArticleId);
-        if (index !== -1) {
-          this.articles[index] = articleData;
+      const dialogRef = this.dialog.open(ConfirmationModalComponent, {
+        width: '400px',
+        data: {
+          title: this.isEditMode ? 'Modifier l\'article' : 'Ajouter un nouvel article',
+          message: this.isEditMode
+            ? 'Êtes-vous sûr de vouloir modifier cet article ?'
+            : 'Êtes-vous sûr de vouloir ajouter cet article ?',
+          confirmText: 'Confirmer',
+          cancelText: 'Annuler'
         }
-      } else {
-        // Ajouter un nouvel article
-        this.articles.push(articleData);
-      }
+      });
 
-      console.log('Article sauvegardé:', articleData);
-
-
-
-
-      //  createAnnonce(annonce: Annonce): Observable<Annonce> {
-      //     return this.httpService.post(endpoints.annonce.create, annonce);
-      //   }
-      this.resetForm();
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          this.saveArticle();
+          this.eventBusService.emit(Event.AJOUTER_ARTICLE)
+        }
+      });
     }
-    this.eventBusService.emit<void>(Event.AJOUTER_ARTICLE);
+  }
 
+  private saveArticle(): void {
+    const articleData: Article = {
+      ...this.articleForm.value
+    };
+
+    if (this.isEditMode) {
+      // Mettre à jour l'article
+      const index = this.articles.findIndex(a => a.id === this.currentArticleId);
+      if (index !== -1) {
+        this.articles[index] = articleData;
+      }
+      this.dataService.updateArticle(this.currentArticleId!,articleData).subscribe(
+        ()=>{
+          this.showSuccessMessage('Article modifié avec succès !');
+          this.eventBusService.emit<void>(Event.AJOUTER_ARTICLE);
+        }
+      );
+    } else {
+      // Ajouter un nouvel article
+      this.articles.push(articleData);
+      this.dataService.saveArticle(articleData).subscribe(
+        ()=>{
+          this.showSuccessMessage('Article ajouté avec succès !');
+          this.eventBusService.emit<void>(Event.AJOUTER_ARTICLE);
+        }
+      );
+    }
+
+    this.resetForm();
+  }
+
+  private showSuccessMessage(message: string): void {
+    this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: {
+        title: 'Succès',
+        message: message,
+        isSuccess: true,
+        confirmText: 'OK'
+      }
+    });
   }
 
   resetForm(): void {
@@ -108,9 +146,4 @@ export class FormArticleComponent implements OnInit {
     this.currentArticleId = null;
   }
 
-  private generateId(): number {
-    return this.articles.length > 0
-      ? Math.max(...this.articles.map(a => a.id)) + 1
-      : 1;
-  }
 }

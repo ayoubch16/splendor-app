@@ -14,13 +14,17 @@ import { MatDialog } from '@angular/material/dialog';
 import { BehaviorSubject, Observable } from "rxjs";
 import { finalize } from 'rxjs/operators';
 
-import { Article, ArticleTable, Client, Facture, StatutFacture } from "../../../interfaces/entites";
+import {Article, ArticleTable, Client, Facture, StatutFacture, TypeDocument} from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
 import { FormArticleComponent } from "../../articles/form-article/form-article.component";
 import {MatSpinner} from "@angular/material/progress-spinner";
 import {DomSanitizer} from "@angular/platform-browser";
 import {PdfService} from "../../../services/pdf.service";
 import {PdfViewerModalComponent} from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
+import {DownloadFactureComponent} from "../download-facture/download-facture.component";
+import {DownloadFacturePrintComponent} from "../download-facture-print/download-facture-print.component";
+import {ChangeStatusComponent} from "../../../components/change-status/change-status.component";
+import {SendEmailComponent} from "../../../components/send-email/send-email.component";
 
 @Component({
   selector: 'app-form-facture',
@@ -38,7 +42,9 @@ import {PdfViewerModalComponent} from "../../../components/pdf-viewer-modal/pdf-
     MatIconModule,
     MatMenuModule,
     MatSnackBarModule,
-    MatSpinner
+    MatSpinner,
+    DownloadFactureComponent,
+    DownloadFacturePrintComponent
   ],
   templateUrl: './form-facture.component.html',
   styleUrls: ['./form-facture.component.scss']
@@ -200,7 +206,7 @@ export class FormFactureComponent implements OnInit {
 
     this.isLoading = true;
     const facture: Facture = {
-      id: this.currentFactureId || 0,
+      id: this.currentFactureId!,
       numFacture: this.factureNumber,
       client: client,
       montant: this.totalTTC.toFixed(2),
@@ -214,12 +220,15 @@ export class FormFactureComponent implements OnInit {
         prixTotal: article.prixTotal
       }))
     };
+    console.log("length avant :"+facture.articles.length)
 
-    this.dataService.updateFacture(facture).pipe(
+    this.dataService.updateFacture(this.currentFactureId!,facture).pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
       next: () => {
         this.showSuccessMessage('Facture modifiée avec succès');
+        console.log("length apres :"+facture.articles.length)
+
         this.loadFactures();
       },
       error: (error: { message: any; }) => {
@@ -230,11 +239,11 @@ export class FormFactureComponent implements OnInit {
 
   editFacture(facture: Facture): void {
     this.isEditMode = true;
-    this.currentFactureId = facture.id;
+    this.currentFactureId! = facture.id!;
     this.clientName=facture.client.raisonSociale
     this.selectedClientId = facture.client.id;
     this.factureDate = facture.date;
-    this.factureNumber = facture.numFacture;
+    this.factureNumber! = facture.numFacture!;
 
     const articles: ArticleTable[] = facture.articles.map(article => ({
       designation: article.designation,
@@ -251,7 +260,7 @@ export class FormFactureComponent implements OnInit {
   deleteFacture(facture: Facture): void {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
       this.isLoading = true;
-      this.dataService.deleteFacture(facture.id).pipe(
+      this.dataService.deleteFacture(facture.id!).pipe(
         finalize(() => this.isLoading = false)
       ).subscribe({
         next: () => {
@@ -302,56 +311,10 @@ export class FormFactureComponent implements OnInit {
     });
   }
 
-
-
-  /**
-   * Télécharge la facture au format PDF
-   */
-  downloadFacture(facture: Facture): void {
-    this.isLoading = true;
-    this.pdfService.generateFacturePdf(facture, {
-      type: 'FACTURE',
-      withSignature: true
-    })
-      .then(blob => {
-        this.pdfService.downloadPdf(blob, `Facture_${facture.numFacture}.pdf`);
-        this.isLoading = false;
-      })
-      .catch(error => {
-        this.showErrorMessage('Erreur lors de la génération du PDF');
-        this.isLoading = false;
-        console.error(error);
-      });
-  }
-
-  /**
-   * Télécharge la facture au format PDF pour impression
-   */
-  downloadFactureForPrint(facture: Facture): void {
-    this.isLoading = true;
-    this.pdfService.generateFacturePdf(facture, {
-      type: 'FACTURE',
-      withSignature: false,
-      printVersion: true
-    })
-      .then(blob => {
-        this.pdfService.downloadPdf(blob, `Facture_${facture.numFacture}_print.pdf`);
-        this.isLoading = false;
-      })
-      .catch(error => {
-        this.showErrorMessage('Erreur lors de la génération du PDF');
-        this.isLoading = false;
-        console.error(error);
-      });
-  }
-
-  /**
-   * Ouvre un modal pour consulter la facture en PDF
-   */
   viewFacturePdf(facture: Facture): void {
     this.isLoading = true;
-    this.pdfService.generateFacturePdf(facture)
-      .then(blob => {
+    this.pdfService.generatePdf(facture)
+        .then(blob => {
         this.dialog.open(PdfViewerModalComponent, {
           width: '90%',
           maxWidth: '1000px',
@@ -361,7 +324,7 @@ export class FormFactureComponent implements OnInit {
             filename: `Facture_${facture.numFacture}.pdf`
           }
         });
-        this.isLoading = false;
+      this.isLoading = false;
       })
       .catch(error => {
         this.showErrorMessage('Erreur lors de la génération du PDF');
@@ -370,19 +333,108 @@ export class FormFactureComponent implements OnInit {
       });
   }
 
-  /**
-   * Génère un bon de livraison
-   */
-  generateBL(facture: Facture): void {
-    // Implémentation future pour générer un BL
-    this.showSuccessMessage('Fonctionnalité à implémenter : Génération de bon de livraison');
+
+  changerStatut(facture: any) {
+    const dialogRef = this.dialog.open(ChangeStatusComponent, {
+      data: {
+        currentStatus: facture.status,
+        documentId: facture.id,
+        documentType: TypeDocument.FACTURE
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(newStatus => {
+      if (newStatus) {
+              console.log("newStatus : "+newStatus)
+              this.isLoading = true;
+              this.dataService.updateFactureStatut(facture.id!, newStatus)
+                .pipe(finalize(() => this.isLoading = false))
+                .subscribe({
+                  next: () => {
+                    this.showSuccessMessage('Statut mis à jour avec succès');
+                    this.loadFactures();
+                  },
+                  error: (error) => {
+                    this.showErrorMessage(`Erreur: ${error.message}`);
+                  }
+                });
+      }
+    });
   }
 
-  /**
-   * Envoie la facture par email
-   */
-  sendFacture(facture: Facture): void {
-    // Implémentation future pour envoyer la facture par email
-    this.showSuccessMessage('Fonctionnalité à implémenter : Envoi de facture par email');
+  // Modifiez temporairement votre méthode envoyerParMail
+  // envoyerParMail(facture: Facture): void {
+  //   const dialogRef = this.dialog.open(SendEmailComponent, {
+  //     width: '600px',
+  //     data: {
+  //             documentId: facture.id!,
+  //             documentNumber: facture.numFacture,
+  //             clientEmail: facture.client?.email,
+  //             typeDocument: TypeDocument.FACTURE
+  //     }
+  //   });
+  //
+  //   dialogRef.afterClosed().subscribe(resultEmail => {
+  //     if (resultEmail) {
+  //       this.isLoading = true;
+  //
+  //       // TEST SIMPLE SANS FICHIER
+  //       this.dataService.sendSimpleEmail({
+  //         to: resultEmail.email,
+  //         subject: resultEmail.subject,
+  //         message: resultEmail.message
+  //       }).pipe(finalize(() => this.isLoading = false))
+  //         .subscribe({
+  //           next: () => this.showSuccessMessage('Email envoyé avec succès'),
+  //           error: (error) => {
+  //             console.error('Erreur complète:', error);
+  //             this.showErrorMessage(`Erreur: ${error.message}`);
+  //           }
+  //         });
+  //     }
+  //   });
+  // }
+
+  envoyerParMail(facture: Facture): void {
+    const dialogRef = this.dialog.open(SendEmailComponent, {
+      width: '600px',
+      data: {
+        documentId: facture.id!,
+        documentNumber: facture.numFacture,
+        clientEmail: facture.client?.email,
+        typeDocument: TypeDocument.FACTURE
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(resultEmail => {
+      if (resultEmail) {
+        this.isLoading = true;
+
+        // Supposons que vous avez récupéré le PDF sous forme de Blob
+        const pdfBlob = new Blob([/* contenu PDF */], { type: 'application/pdf' });
+        const pdfFile = new File([pdfBlob], `facture_${facture.numFacture}.pdf`);
+
+        this.dataService.sendEmailAsJson(
+          {
+            to: resultEmail.email,
+            subject: resultEmail.subject,
+            message: resultEmail.message
+          },
+          pdfFile
+        ).pipe(finalize(() => this.isLoading = false))
+          .subscribe({
+              next: () => {
+                this.showSuccessMessage('Email envoyé avec succès');
+              },
+              error: (error) => {
+                console.error('Erreur complète:', error);
+                this.showErrorMessage(`Erreur lors de l'envoi: ${error.message}`);
+              }
+            });
+
+      }
+    });
   }
+
+
 }

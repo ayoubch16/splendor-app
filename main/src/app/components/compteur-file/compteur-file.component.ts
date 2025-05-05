@@ -3,6 +3,7 @@ import { MaterialModule } from '../../material.module';
 import { MatButtonModule } from '@angular/material/button';
 import { TablerIconsModule } from 'angular-tabler-icons';
 import {NgClass} from "@angular/common";
+import {DataService} from "../../services/data.service";
 
 @Component({
   selector: 'app-compteur-file',
@@ -12,35 +13,41 @@ import {NgClass} from "@angular/common";
 })
 export class CompteurFileComponent implements OnInit {
   @Input() typeDocument = ''; // DEVIS, FACTURE ou BL
-  nombreDocuments = 0;
+  nombreDocuments: number;
+
+  constructor(private dataService: DataService) {
+  }
 
 
   ngOnInit(): void {
-    // Ici vous pouvez implémenter la logique pour récupérer le nombre de documents
-    // en fonction du typeDocument
     this.calculerNombreDocuments();
+    this.dataService.getCptFacture().subscribe(
+      (count: number) => {
+        console.log("cpt devis : " + count); // Affiche la vraie valeur
+      }
+    );
   }
 
   calculerNombreDocuments(): void {
-    // Exemple de logique - à remplacer par votre implémentation réelle
     switch(this.typeDocument) {
       case 'DEVIS':
-        this.nombreDocuments = 85; // Remplacer par votre valeur réelle
+        this.dataService.getCptDevis().subscribe(
+          (count: number) => this.nombreDocuments = count
+        );
         break;
       case 'FACTURE':
-        this.nombreDocuments = 140;
+        this.dataService.getCptFacture().subscribe(
+          (count: number) => this.nombreDocuments = count
+        );
         break;
       case 'BL':
-        this.nombreDocuments = 65;
+        this.dataService.getCptBl().subscribe(
+          (count: number) => this.nombreDocuments = count
+        );
         break;
       default:
         this.nombreDocuments = 0;
     }
-
-    // Alternative: vous pourriez faire un appel API ici pour récupérer le nombre
-    // this.documentService.getCountByType(this.typeDocument).subscribe(count => {
-    //   this.nombreDocuments = count;
-    // });
   }
 
   getCardClass(): string {

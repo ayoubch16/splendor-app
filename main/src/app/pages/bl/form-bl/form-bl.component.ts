@@ -14,10 +14,16 @@ import {MatDialog} from '@angular/material/dialog';
 import {BehaviorSubject, Observable} from "rxjs";
 import {finalize} from 'rxjs/operators';
 
-import {Article, ArticleTable, Bl, Client, StatutBL} from "../../../interfaces/entites";
+import {Article, ArticleTable, Bl, Client, StatutBL, TypeDocument} from "../../../interfaces/entites";
 import {DataService} from "../../../services/data.service";
 import {FormArticleComponent} from "../../articles/form-article/form-article.component";
 import {MatSpinner} from "@angular/material/progress-spinner";
+import {DownloadBlComponent} from "../download-bl/download-bl.component";
+import {DownloadBlPrintComponent} from "../download-bl-print/download-bl-print.component";
+import {ChangeStatusComponent} from "../../../components/change-status/change-status.component";
+import {SendEmailComponent} from "../../../components/send-email/send-email.component";
+import {PdfService} from "../../../services/pdf.service";
+import {PdfViewerModalComponent} from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
 
 @Component({
   selector: 'app-form-bl',
@@ -36,6 +42,8 @@ import {MatSpinner} from "@angular/material/progress-spinner";
     MatMenuModule,
     MatSnackBarModule,
     MatSpinner,
+    DownloadBlComponent,
+    DownloadBlPrintComponent,
   ],
   templateUrl: './form-bl.component.html'
 })
@@ -68,7 +76,8 @@ export class FormBlComponent implements OnInit {
   constructor(
     private dataService: DataService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private pdfService:PdfService
   ) { }
 
   ngOnInit(): void {
@@ -202,7 +211,7 @@ export class FormBlComponent implements OnInit {
       }))
     };
 
-    this.dataService.updateBl(bl).pipe(
+    this.dataService.updateBl(this.currentBlId!,bl).pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
       next: () => {
@@ -283,5 +292,80 @@ export class FormBlComponent implements OnInit {
       duration: 5000,
       panelClass: ['error-snackbar']
     });
+  }
+
+  changerStatut(bl: Bl): void {
+    const dialogRef = this.dialog.open(ChangeStatusComponent, {
+      width: '400px',
+      data: { currentStatus: bl.statut, blId: bl.id!,documentType: TypeDocument.BL }
+    });
+
+    dialogRef.afterClosed().subscribe(newStatus => {
+      if (newStatus) {
+        console.log("newStatus : "+newStatus)
+        this.isLoading = true;
+        this.dataService.updateBlStatut(bl.id!, newStatus)
+          .pipe(finalize(() => this.isLoading = false))
+          .subscribe({
+            next: () => {
+              this.showSuccessMessage('Statut mis à jour avec succès');
+              this.loadBls();
+            },
+            error: (error) => {
+              this.showErrorMessage(`Erreur: ${error.message}`);
+            }
+          });
+      }
+    });
+  }
+
+  envoyerParMail(bl: Bl): void {
+    const dialogRef = this.dialog.open(SendEmailComponent, {
+      width: '600px',
+      data: {
+        documentId: bl.id!,
+        documentNumber: bl.numBl,
+        clientEmail: bl.client?.email,
+        typeDocument: TypeDocument.BL
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(resultEmail => {
+      if (resultEmail) {
+        this.isLoading = true;
+        this.dataService.sendDevisByEmail(bl.id!)
+          .pipe(finalize(() => this.isLoading = false))
+          .subscribe({
+            next: () => {
+              this.showSuccessMessage('Email envoyé avec succès');
+            },
+            error: (error) => {
+              this.showErrorMessage(`Erreur: ${error.message}`);
+            }
+          });
+      }
+    });
+  }
+
+  consulterBl(bl: Bl): void {
+    this.isLoading = true;
+    this.pdfService.generatePdf(bl)
+      .then(blob => {
+        this.dialog.open(PdfViewerModalComponent, {
+          width: '90%',
+          maxWidth: '1000px',
+          data: {
+            title: `BL ${bl.numBl}`,
+            pdfBlob: blob,
+            filename: `BL_${bl.numBl}.pdf`
+          }
+        });
+        this.isLoading = false;
+      })
+      .catch(error => {
+        this.showErrorMessage('Erreur lors de la génération du PDF');
+        this.isLoading = false;
+        console.error(error);
+      });
   }
 }

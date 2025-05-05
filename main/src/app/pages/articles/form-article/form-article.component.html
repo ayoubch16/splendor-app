@@ -17,12 +17,9 @@
           </mat-form-field>
         </div>
         <div class="col-lg-6">
-          <mat-label class="f-w-600 m-b-8 d-block">Unité*</mat-label>
+          <mat-label class="f-w-600 m-b-8 d-block">Unité</mat-label>
           <mat-form-field appearance="outline" class="w-100">
             <input matInput formControlName="unite" placeholder="Unité (kg, pièce, etc.)" />
-            <mat-error *ngIf="articleForm.get('unite')?.hasError('required')">
-              Ce champ est obligatoire
-            </mat-error>
           </mat-form-field>
         </div>
         <div class="col-lg-6">

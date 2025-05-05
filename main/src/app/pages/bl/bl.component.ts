@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
 import {FormBlComponent} from "./form-bl/form-bl.component";
-import {ListBlComponent} from "./list-bl/list-bl.component";
 
 @Component({
   selector: 'app-bl',

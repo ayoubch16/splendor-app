@@ -21,11 +21,8 @@
   <button mat-icon-button extended [matMenuTriggerFor]="profilemenu" aria-label="Notifications"
     class="d-flex align-items-center justify-content-center profile-btn-dd">
     <img src="/assets/images/profile/user-1.jpg" alt="user 1" class="rounded-circle object-cover icon-35 profile-dd" width="35" />
-    {{ authService.getCurrentUser()?.email }}
   </button>
   <mat-menu #profilemenu="matMenu" class="topbar-dd cardWithShadow">
-
-
     <div class="p-x-12 m-t-12">
       <button mat-stroked-button (click)="logout()" class="w-100">Logout</button>
     </div>

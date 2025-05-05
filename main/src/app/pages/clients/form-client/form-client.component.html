@@ -30,15 +30,12 @@
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">Ville*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
-            <input type="text" matInput formControlName="ville" placeholder="Rechercher une ville" [matAutocomplete]="auto"/>
-            <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onVilleSelected($event)">
-              <mat-option *ngFor="let ville of filteredVilles | async" [value]="ville.ville">
-                {{ville.ville}}
+            <input type="text" matInput placeholder="Ville" formControlName="ville" [matAutocomplete]="autoVille">
+            <mat-autocomplete #autoVille="matAutocomplete" [displayWith]="displayVille" (optionSelected)="onVilleSelected($event)">
+              <mat-option *ngFor="let ville of filteredVilles | async" [value]="ville">
+                {{ville.nom}} ({{ville.codePostal}})
               </mat-option>
             </mat-autocomplete>
-            <mat-error *ngIf="clientForm.get('ville')?.hasError('required')">
-              Ce champ est obligatoire
-            </mat-error>
           </mat-form-field>
         </div>
 
@@ -75,7 +72,7 @@
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">ICE*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
-            <input matInput formControlName="ice" placeholder="ICE (7 chiffres)" />
+            <input matInput formControlName="ice" placeholder="ICE ( chiffres)" />
             <mat-error *ngIf="clientForm.get('ice')?.hasError('required')">
               Ce champ est obligatoire
             </mat-error>
@@ -128,7 +125,7 @@
     <mat-card-title class="m-b-0">Liste des Clients</mat-card-title>
   </mat-card-header>
   <mat-card-content>
-    <table mat-table [dataSource]="clients$" class="w-100">
+    <table mat-table [dataSource]="clients" class="w-100">
       <!-- Colonne Raison Sociale -->
       <ng-container matColumnDef="raisonSociale">
         <th mat-header-cell *matHeaderCellDef>Raison Sociale</th>
@@ -138,7 +135,7 @@
       <!-- Colonne Ville -->
       <ng-container matColumnDef="adresse">
         <th mat-header-cell *matHeaderCellDef>Adresse</th>
-        <td mat-cell *matCellDef="let client">{{ client.ville }}</td>
+        <td mat-cell *matCellDef="let client">{{ client.ville.nom }}</td>
       </ng-container>
 
       <!-- Colonne ICE -->

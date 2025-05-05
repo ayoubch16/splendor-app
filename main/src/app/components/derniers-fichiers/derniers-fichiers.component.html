@@ -64,12 +64,47 @@
               <mat-icon>more_vert</mat-icon>
             </button>
             <mat-menu #menu="matMenu" xPosition="before">
-              <button mat-menu-item (click)="download(element)">
-                <mat-icon>file_download</mat-icon> Télécharger
-              </button>
-              <button mat-menu-item (click)="print(element)">
-                <mat-icon>print</mat-icon> Imprimer
-              </button>
+              <ng-container [ngSwitch]="typeDocument">
+                <!-- Devis -->
+                <ng-container *ngSwitchCase="'DEVIS'">
+                  <button mat-menu-item (click)="download(element)">
+                    <app-download-devis [devis]="element"></app-download-devis>
+                  </button>
+                  <button mat-menu-item (click)="print(element)">
+                    <app-download-devis-print [devis]="element"></app-download-devis-print>
+                  </button>
+                </ng-container>
+
+                <!-- Bon de Livraison -->
+                <ng-container *ngSwitchCase="'BL'">
+                  <button mat-menu-item (click)="download(element)">
+                    <app-download-bl [bl]="element"></app-download-bl>
+                  </button>
+                  <button mat-menu-item (click)="print(element)">
+                    <app-download-bl-print [bl]="element"></app-download-bl-print>
+                  </button>
+                </ng-container>
+
+                <!-- Facture -->
+                <ng-container *ngSwitchCase="'FACTURE'">
+                  <button mat-menu-item (click)="download(element)">
+                    <app-download-facture [facture]="element"></app-download-facture>
+                  </button>
+                  <button mat-menu-item (click)="print(element)">
+                    <app-download-facture-print [facture]="element"></app-download-facture-print>
+                  </button>
+                </ng-container>
+
+                <!-- Par défaut -->
+                <ng-container *ngSwitchDefault>
+                  <button mat-menu-item (click)="download(element)">
+                    <mat-icon>file_download</mat-icon> Télécharger
+                  </button>
+                  <button mat-menu-item (click)="print(element)">
+                    <mat-icon>print</mat-icon> Imprimer
+                  </button>
+                </ng-container>
+              </ng-container>
             </mat-menu>
           </td>
         </ng-container>

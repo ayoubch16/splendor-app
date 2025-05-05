@@ -1,9 +1,7 @@
-import {Injectable} from "@angular/core";
-import {HttpClient} from "@angular/common/http";
-import {catchError, map, Observable} from "rxjs";
-import {finalize} from "rxjs/operators";
-import {buildQueryParams} from "../utils/string-utils";
-
+import { Injectable } from "@angular/core";
+import { HttpClient, HttpHeaders, HttpParams } from "@angular/common/http";
+import { Observable, catchError, map, throwError } from "rxjs";
+import { finalize } from "rxjs/operators";
 
 @Injectable({
   providedIn: 'root',
@@ -13,58 +11,95 @@ export class HttpService {
 
   constructor(
     private httpClient: HttpClient,
+  ) { }
 
-  ) {
+  get(endpoint: string, options: HttpRequestOptions = {}): Observable<any> {
+    return this.baseRequest(Method.get, endpoint, null, options);
   }
 
-  get(endpoint: string): Observable<any> {
-    return this.baseRequest(Method.get, endpoint, null)
+  post(endpoint: string, data: any): Observable<any> {
+    return this.baseRequest(Method.post, endpoint, data);
   }
 
-  // post(endpoint: string, data: any, options: HttpRequestOptions = {}): Observable<any> {
-  //   return this.baseRequest(Method.post, endpoint, data, options)
-  // }
-  //
-  // put(endpoint: string, data: any, options: HttpRequestOptions = {}): Observable<any> {
-  //   return this.baseRequest(Method.put, endpoint, data, options)
-  // }
-  //
-  // patch(endpoint: string, data: any, options: HttpRequestOptions = {}): Observable<any> {
-  //   return this.baseRequest(Method.patch, endpoint, data, options)
-  // }
-  //
-  // delete(endpoint: string, options: HttpRequestOptions = {}): Observable<any> {
-  //   return this.baseRequest(Method.delete, endpoint, null, options)
-  // }
+  put(endpoint: string, data: any, options: HttpRequestOptions = {}): Observable<any> {
+    return this.baseRequest(Method.put, endpoint, data, options);
+  }
 
+  patch(endpoint: string, data: any, options: HttpRequestOptions = {}): Observable<any> {
+    return this.baseRequest(Method.patch, endpoint, data, options);
+  }
 
-  private baseRequest(method: Method, endpoint: string, data: any): Observable<any> {
-    return this.httpClient.request(method, this.base_url + endpoint , {
+  delete(endpoint: string, options: HttpRequestOptions = {}): Observable<any> {
+    return this.baseRequest(Method.delete, endpoint, null, options);
+  }
+
+  private baseRequest(method: Method, endpoint: string, data: any, options: HttpRequestOptions = {}): Observable<any> {
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json',
+      ...(options.useToken && { 'Authorization': `Bearer ${this.getToken()}` })
+    });
+
+    let params = new HttpParams();
+    if (options.queryParameters) {
+      Object.entries(options.queryParameters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params = params.append(key, value.toString());
+        }
+      });
+    }
+
+    if (options.showLoading) {
+      // Ici, vous pourriez implémenter une logique pour afficher un indicateur de chargement
+      // Par exemple: this.loadingService.show();
+    }
+
+    return this.httpClient.request(method, `${this.base_url}${endpoint}`, {
       body: data,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      responseType: 'text' // Changez en 'text' et parsez manuellement
+      headers: headers,
+      params: params,
+      responseType: 'text'
     }).pipe(
       map(response => {
         try {
-          return typeof response === 'string' ? JSON.parse(response) : response;
+          return typeof response === 'string' && response.trim() ? JSON.parse(response) : response;
         } catch (e) {
-          return response; // ou throw une erreur selon votre besoin
+          return response;
+        }
+      }),
+      catchError(error => {
+        if (options.showErrorAlert) {
+          // Ici, vous pourriez implémenter une logique pour afficher une alerte d'erreur
+          // Par exemple: this.alertService.showError(error.message);
+        }
+        return throwError(() => error);
+      }),
+      finalize(() => {
+        if (options.showLoading) {
+          // Fin du chargement
+          // Par exemple: this.loadingService.hide();
         }
       })
     );
   }
+
+  private getToken(): string {
+    // Implémentez la récupération du token depuis le localStorage ou un service d'authentification
+    return localStorage.getItem('auth_token') || '';
+  }
 }
 
 enum Method {
-  'get' = 'get', 'post' = 'post', 'put' = 'put', 'patch' = 'patch', 'delete' = 'delete'
+  get = 'GET',
+  post = 'POST',
+  put = 'PUT',
+  patch = 'PATCH',
+  delete = 'DELETE'
 }
 
 export interface HttpRequestOptions {
-  useToken?: boolean,
-  showLoading?: boolean,
-  showErrorAlert?: boolean,
-  usePagination?: boolean,
-  queryParameters?: object
+  useToken?: boolean;
+  showLoading?: boolean;
+  showErrorAlert?: boolean;
+  usePagination?: boolean;
+  queryParameters?: Record<string, any>;
 }

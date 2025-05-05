@@ -28,15 +28,15 @@
         </div>
       </div>
 
-      <!-- Numéro du devis -->
-      <div class="row" style="justify-content: end">
-        <div class="col-lg-4">
-          <mat-label class="f-w-600 m-b-8 d-block">Numéro</mat-label>
-          <mat-form-field appearance="outline" class="w-100" color="primary">
-            <input matInput [(ngModel)]="devisNumber" name="numDevis" disabled />
-          </mat-form-field>
-        </div>
-      </div>
+       Numéro du devis
+            <div class="row" style="justify-content: end">
+              <div class="col-lg-4">
+                <mat-label class="f-w-600 m-b-8 d-block">Numéro</mat-label>
+                <mat-form-field appearance="outline" class="w-100" color="primary">
+                  <input matInput [(ngModel)]="devisNumber" name="numDevis" disabled />
+                </mat-form-field>
+              </div>
+            </div>
 
       <!-- Section articles -->
       <div class="article-table-container m-t-20 m-b-20">
@@ -243,24 +243,30 @@
                 <mat-icon>more_vert</mat-icon>
               </button>
               <mat-menu #menu="matMenu" xPosition="before">
-                <button mat-menu-item>
+                <button mat-menu-item (click)="consulterDevis(element)">
                   <mat-icon>visibility</mat-icon> Consulter
                 </button>
                 <button mat-menu-item (click)="editDevis(element)">
                   <mat-icon>edit</mat-icon> Modifier
                 </button>
+                <button mat-menu-item (click)="changerStatut(element)">
+                  <mat-icon>swap_vert</mat-icon> Changer Statut
+                </button>
                 <button mat-menu-item (click)="deleteDevis(element)">
                   <mat-icon>delete</mat-icon> Supprimer
                 </button>
-                <button mat-menu-item>
+                <button mat-menu-item
+                        (click)="genererFacture(element)">
                   <mat-icon>request_page</mat-icon> Générer Facture
                 </button>
-                <button mat-menu-item>
-                  <mat-icon>download</mat-icon> Télécharger
+                <button mat-menu-item (click)="genererBonLivraison(element)">
+                  <mat-icon>request_page</mat-icon> Générer BL
                 </button>
-                <button mat-menu-item>
-                  <mat-icon>print</mat-icon> Télécharger pour Impression
-                </button>
+                <app-download-devis [devis]="element"></app-download-devis>
+                <app-download-devis-print [devis]="element"></app-download-devis-print>
+                                <button mat-menu-item (click)="envoyerParMail(element)">
+                                  <mat-icon>email</mat-icon> Envoyer Par mail
+                                </button>
               </mat-menu>
             </td>
           </ng-container>

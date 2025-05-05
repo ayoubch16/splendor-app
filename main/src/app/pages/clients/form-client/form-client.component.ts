@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -9,13 +9,16 @@ import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Client } from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
-import { Observable, map, startWith } from "rxjs";
+import { map, Observable, startWith } from "rxjs";
 import { finalize } from 'rxjs/operators';
-import { HttpClient } from '@angular/common/http';
+import { EventBusService } from "../../../services/event-bus.service";
+import { Event } from "../../../interfaces/EmitEvent";
+import { ConfirmationModalComponent } from "../../../components/confirmation-modal/confirmation-modal.component";
 
 @Component({
   selector: 'app-form-client',
@@ -32,13 +35,14 @@ import { HttpClient } from '@angular/common/http';
     MatIconModule,
     MatTooltipModule,
     MatSnackBarModule,
-    MatAutocompleteModule
+    MatAutocompleteModule,
+    MatDialogModule
   ],
   templateUrl: './form-client.component.html',
 })
 export class FormClientComponent implements OnInit {
   clientForm: FormGroup;
-  clients$: Observable<Client[]>;
+  clients: Client[] = [];
   isEditMode = false;
   currentClientId: number | null = null;
   isLoading = false;
@@ -50,8 +54,8 @@ export class FormClientComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private dataService: DataService,
-    private snackBar: MatSnackBar,
-    private http: HttpClient
+    private eventBusService: EventBusService,
+    private dialog: MatDialog
   ) {
     this.clientForm = this.fb.group({
       raisonSociale: ['', Validators.required],
@@ -60,7 +64,7 @@ export class FormClientComponent implements OnInit {
       ville: ['', Validators.required],
       region: ['', Validators.required],
       pays: ['MAROC', Validators.required],
-      ice: ['', [Validators.required, Validators.pattern(/^[0-9]{7}$/)]],
+      ice: ['', [Validators.required, Validators.pattern(/^[0-9]{15}$/)]],
       telephone: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
       email: ['', [Validators.required, Validators.email]]
     });
@@ -74,33 +78,55 @@ export class FormClientComponent implements OnInit {
   ngOnInit(): void {
     this.loadClients();
     this.loadVilles();
+    this.setupEventListeners();
   }
 
-  private _filterVilles(value: string): any[] {
-    const filterValue = value.toLowerCase();
-    return this.villes.filter(ville =>
-      ville.ville.toLowerCase().includes(filterValue) ||
-      ville.codePostal.includes(filterValue)
+  private setupEventListeners(): void {
+    this.eventBusService.onObserver([Event.AJOUTER_CLIENT]).subscribe(
+      () => this.loadClients()
     );
   }
 
   loadVilles(): void {
-    this.dataService.getVille().subscribe(data => {
+    this.dataService.getVilles().subscribe(data => {
       this.villes = data;
     });
   }
 
+  private _filterVilles(value: string | any): any[] {
+    if (!value) return this.villes;
+
+    const filterValue = typeof value === 'string'
+      ? value.toLowerCase()
+      : value.nom.toLowerCase();
+
+    return this.villes.filter(ville =>
+      ville.nom.toLowerCase().includes(filterValue) ||
+      ville.codePostal.includes(filterValue)
+    );
+  }
+
+  displayVille(ville: any): string {
+    return ville && ville.nom ? ville.nom : '';
+  }
+
   loadClients(): void {
     this.isLoading = true;
-    this.clients$ = this.dataService.getClients().pipe(
+    this.dataService.getClients().pipe(
       finalize(() => this.isLoading = false)
+    ).subscribe(
+      clients => this.clients = clients
     );
   }
 
   onVilleSelected(event: any): void {
-    const selectedVille = this.villes.find(v => v.ville === event.option.value);
+    const selectedVille = typeof event.option.value === 'string'
+      ? this.villes.find(v => v.nom === event.option.value)
+      : event.option.value;
+
     if (selectedVille) {
       this.clientForm.patchValue({
+        ville: selectedVille, // Affiche seulement le nom dans le champ
         codePostal: selectedVille.codePostal,
         region: selectedVille.region
       });
@@ -110,15 +136,34 @@ export class FormClientComponent implements OnInit {
   onSubmit(): void {
     if (this.clientForm.invalid) return;
 
+    const dialogRef = this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: {
+        title: this.isEditMode ? 'Modifier le client' : 'Ajouter un nouveau client',
+        message: this.isEditMode
+          ? 'Êtes-vous sûr de vouloir modifier ce client ?'
+          : 'Êtes-vous sûr de vouloir ajouter ce client ?',
+        confirmText: 'Confirmer',
+        cancelText: 'Annuler'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        this.saveClient();
+      }
+    });
+  }
+
+  private saveClient(): void {
     this.isLoading = true;
     const clientData: Client = {
       ...this.clientForm.value,
-      id: this.isEditMode && this.currentClientId ? this.currentClientId : 0
     };
 
     const operation$ = this.isEditMode
-      ? this.dataService.updateClient(clientData)
-      : this.dataService.addClient(clientData);
+      ? this.dataService.updateClient(this.currentClientId!, clientData)
+      : this.dataService.saveClient(clientData);
 
     operation$.pipe(
       finalize(() => this.isLoading = false)
@@ -126,7 +171,7 @@ export class FormClientComponent implements OnInit {
       next: () => {
         this.showSuccessMessage(`Client ${this.isEditMode ? 'modifié' : 'ajouté'} avec succès`);
         this.resetForm();
-        this.loadClients();
+        this.eventBusService.emit(Event.AJOUTER_CLIENT);
       },
       error: (error) => {
         this.showErrorMessage(`Erreur: ${error.message}`);
@@ -137,25 +182,45 @@ export class FormClientComponent implements OnInit {
   editClient(client: Client): void {
     this.isEditMode = true;
     this.currentClientId = client.id;
-    this.clientForm.patchValue(client);
+
+    // Préparation des données pour l'affichage
+    const formData = {
+      ...client,
+      ville: client.ville?.nom || client.ville // Gère le cas où ville est un objet ou juste le nom
+    };
+
+    this.clientForm.patchValue(formData);
     this.scrollToForm();
   }
 
   deleteClient(clientId: number): void {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
-      this.isLoading = true;
-      this.dataService.deleteClient(clientId).pipe(
-        finalize(() => this.isLoading = false)
-      ).subscribe({
-        next: () => {
-          this.showSuccessMessage('Client supprimé avec succès');
-          this.loadClients();
-        },
-        error: (error) => {
-          this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
-        }
-      });
-    }
+    const dialogRef = this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: {
+        title: 'Supprimer le client',
+        message: 'Êtes-vous sûr de vouloir supprimer ce client ?',
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler',
+        isDelete: true
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        this.isLoading = true;
+        this.dataService.deleteClient(clientId).pipe(
+          finalize(() => this.isLoading = false)
+        ).subscribe({
+          next: () => {
+            this.showSuccessMessage('Client supprimé avec succès');
+            this.eventBusService.emit(Event.AJOUTER_CLIENT);
+          },
+          error: (error) => {
+            this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
+          }
+        });
+      }
+    });
   }
 
   resetForm(): void {
@@ -174,16 +239,26 @@ export class FormClientComponent implements OnInit {
   }
 
   private showSuccessMessage(message: string): void {
-    this.snackBar.open(message, 'Fermer', {
-      duration: 3000,
-      panelClass: ['success-snackbar']
+    this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: {
+        title: 'Succès',
+        message: message,
+        isSuccess: true,
+        confirmText: 'OK'
+      }
     });
   }
 
   private showErrorMessage(message: string): void {
-    this.snackBar.open(message, 'Fermer', {
-      duration: 5000,
-      panelClass: ['error-snackbar']
+    this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: {
+        title: 'Erreur',
+        message: message,
+        isError: true,
+        confirmText: 'OK'
+      }
     });
   }
 }
