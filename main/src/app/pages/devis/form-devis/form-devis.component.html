@@ -28,15 +28,15 @@
         </div>
       </div>
 
-       Numéro du devis
-            <div class="row" style="justify-content: end">
-              <div class="col-lg-4">
-                <mat-label class="f-w-600 m-b-8 d-block">Numéro</mat-label>
-                <mat-form-field appearance="outline" class="w-100" color="primary">
-                  <input matInput [(ngModel)]="devisNumber" name="numDevis" disabled />
-                </mat-form-field>
-              </div>
-            </div>
+      <!-- Numéro du devis -->
+      <div class="row" style="justify-content: end">
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Numéro</mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="devisNumber" name="numDevis" disabled />
+          </mat-form-field>
+        </div>
+      </div>
 
       <!-- Section articles -->
       <div class="article-table-container m-t-20 m-b-20">
@@ -173,15 +173,15 @@
             <mat-card class="p-16">
               <div class="d-flex justify-content-between m-b-8">
                 <span>Total HT:</span>
-                <span class="f-w-600">{{totalHT | number:'1.2-2'}} DH</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalHT) | number:'1.2-2'}} DH</span>
               </div>
               <div class="d-flex justify-content-between m-b-8">
                 <span>TVA (20%):</span>
-                <span class="f-w-600">{{tva | number:'1.2-2'}} DH</span>
+                <span class="f-w-600">{{formatNumberForDisplay(tva) | number:'1.2-2'}} DH</span>
               </div>
               <div class="d-flex justify-content-between">
                 <span class="f-w-600">Total TTC:</span>
-                <span class="f-w-600">{{totalTTC | number:'1.2-2'}} DH</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalTTC) | number:'1.2-2'}} DH</span>
               </div>
             </mat-card>
           </div>
@@ -200,11 +200,57 @@
         </button>
       </div>
 
+      <!-- Section filtres -->
+      <h3 class="m-t-32 m-b-10">Filtrer les devis</h3>
+      <div class="row ">
+        <div class="col-lg-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Numéro</mat-label>
+            <input matInput [(ngModel)]="filtreNumero" (input)="appliquerFiltres()"
+                   name="filtreNumero" placeholder="Rechercher par numéro">
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Client</mat-label>
+            <input matInput [(ngModel)]="filtreClient" (input)="appliquerFiltres()"
+                   name="filtreClient" placeholder="Rechercher par client">          </mat-form-field>
+        </div>
+
+        <div class="col-lg-2">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Statut</mat-label>
+            <mat-select [(ngModel)]="filtreStatut" (selectionChange)="appliquerFiltres()"
+                        name="filtreStatut">
+              <mat-option [value]="null">Tous</mat-option>
+              <mat-option *ngFor="let statut of statutsDevis" [value]="statut">
+                {{ statut }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-2">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Date de début</mat-label>
+            <input matInput [(ngModel)]="filtreDateDebut" type="date" (change)="appliquerFiltres()"
+                   name="filtreDateDebut">          </mat-form-field>
+        </div>
+
+        <div class="col-lg-2">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Date de fin</mat-label>
+            <input matInput [(ngModel)]="filtreDateFin" type="date" (change)="appliquerFiltres()">
+          </mat-form-field>
+        </div>
+      </div>
+
       <!-- Liste des devis existants -->
       <div class="m-t-32">
         <h3>Liste des devis</h3>
 
-        <table mat-table [dataSource]="listeDevis" class="w-100 mat-elevation-z1">
+        <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
           <!-- Numéro Devis -->
           <ng-container matColumnDef="numDevis">
             <th mat-header-cell *matHeaderCellDef>Numéro</th>
@@ -255,18 +301,16 @@
                 <button mat-menu-item (click)="deleteDevis(element)">
                   <mat-icon>delete</mat-icon> Supprimer
                 </button>
-                <button mat-menu-item
+                <button mat-menu-item *ngIf="!element.factureExistante"
                         (click)="genererFacture(element)">
                   <mat-icon>request_page</mat-icon> Générer Facture
                 </button>
-                <button mat-menu-item (click)="genererBonLivraison(element)">
+                <button mat-menu-item *ngIf="!element.blExistante"
+                        (click)="genererBonLivraison(element)">
                   <mat-icon>request_page</mat-icon> Générer BL
                 </button>
                 <app-download-devis [devis]="element"></app-download-devis>
                 <app-download-devis-print [devis]="element"></app-download-devis-print>
-                                <button mat-menu-item (click)="envoyerParMail(element)">
-                                  <mat-icon>email</mat-icon> Envoyer Par mail
-                                </button>
               </mat-menu>
             </td>
           </ng-container>
@@ -275,6 +319,8 @@
           <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
           <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
         </table>
+        <!-- Ajoutez le paginator après le tableau -->
+        <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
       </div>
     </form>
   </mat-card-content>

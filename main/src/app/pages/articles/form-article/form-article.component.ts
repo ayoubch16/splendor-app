@@ -50,8 +50,8 @@ export class FormArticleComponent implements OnInit {
   ) {
     this.articleForm = this.fb.group({
       nameArticle: ['', Validators.required],
-      unite: [''],
-      categoryArticle: [null, Validators.required],
+      unite: ['unite'],
+      categoryId: [null, Validators.required],
       descriptionArticle: [''],
       priceArticle: [0, [Validators.required, Validators.min(0)]]
     });
@@ -65,13 +65,14 @@ export class FormArticleComponent implements OnInit {
         this.articleForm.patchValue({
           nameArticle: article.nameArticle,
           unite: article.unite,
-          categoryArticle: article.categoryArticle,
+          categoryId: article.categoryId,
           descriptionArticle: article.descriptionArticle,
           priceArticle: article.priceArticle
         });
       }
     );
     this.categories = this.dataService.getCategories();
+
   }
 
   onSubmit(): void {

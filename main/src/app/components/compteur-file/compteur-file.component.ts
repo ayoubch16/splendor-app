@@ -21,11 +21,7 @@ export class CompteurFileComponent implements OnInit {
 
   ngOnInit(): void {
     this.calculerNombreDocuments();
-    this.dataService.getCptFacture().subscribe(
-      (count: number) => {
-        console.log("cpt devis : " + count); // Affiche la vraie valeur
-      }
-    );
+    this.dataService.getCptFacture().subscribe();
   }
 
   calculerNombreDocuments(): void {

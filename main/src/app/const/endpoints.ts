@@ -48,7 +48,7 @@ export const endpoints = {
     getArticles: (id: number) => `/api/devis/${id}/articles`,
     getLastId: `/api/devis/last-id`,
     getLast: `/api/devis/last-devis`,
-
+    sendDevisByEmail: (id: number) => `/api/devis/${id}/send-email`,
   },
   facture: {
     create: (id: number) =>`/api/factures/${id}`,
@@ -72,4 +72,7 @@ export const endpoints = {
     getArticles: (id: number) => `/api/bls/${id}/articles`,
     getLastId: `/api/bls/last-id`,
   },
+  file: {
+    genererPDF :  '/api/download-pdf'
+  }
 };

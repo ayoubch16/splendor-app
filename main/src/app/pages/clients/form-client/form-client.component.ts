@@ -1,24 +1,26 @@
-import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {AfterViewInit, Component, OnInit, ViewChild} from '@angular/core';
+import {FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { CommonModule } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { Client } from "../../../interfaces/entites";
+import {Client} from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
 import { map, Observable, startWith } from "rxjs";
 import { finalize } from 'rxjs/operators';
 import { EventBusService } from "../../../services/event-bus.service";
 import { Event } from "../../../interfaces/EmitEvent";
 import { ConfirmationModalComponent } from "../../../components/confirmation-modal/confirmation-modal.component";
+import {MatPaginator} from "@angular/material/paginator";
+import {MatProgressSpinner} from "@angular/material/progress-spinner";
 
 @Component({
   selector: 'app-form-client',
@@ -36,11 +38,15 @@ import { ConfirmationModalComponent } from "../../../components/confirmation-mod
     MatTooltipModule,
     MatSnackBarModule,
     MatAutocompleteModule,
-    MatDialogModule
+    MatDialogModule,
+    MatPaginator,
+    FormsModule,
+    MatProgressSpinner
   ],
   templateUrl: './form-client.component.html',
 })
-export class FormClientComponent implements OnInit {
+export class FormClientComponent implements OnInit, AfterViewInit {
+  @ViewChild(MatPaginator) matPaginator!: MatPaginator;
   clientForm: FormGroup;
   clients: Client[] = [];
   isEditMode = false;
@@ -48,8 +54,17 @@ export class FormClientComponent implements OnInit {
   isLoading = false;
   displayedColumns: string[] = ['raisonSociale', 'adresse', 'ice', 'telephone', 'email', 'actions'];
 
+  // Propriétés pour les filtres
+  filtreRaisonSociale: string = '';
+  filtreTelephone: string = '';
+  filtreEmail: string = '';
+  filtreIce: string = '';
+
   villes: any[] = [];
   filteredVilles: Observable<any[]>;
+
+  dataSource: MatTableDataSource<Client> = new MatTableDataSource<Client>();
+  private _paginator!: MatPaginator;
 
   constructor(
     private fb: FormBuilder,
@@ -60,16 +75,13 @@ export class FormClientComponent implements OnInit {
     this.clientForm = this.fb.group({
       raisonSociale: ['', Validators.required],
       adresse: ['', Validators.required],
-      codePostal: ['', Validators.required],
-      ville: ['', Validators.required],
-      region: ['', Validators.required],
-      pays: ['MAROC', Validators.required],
+      ville_id: ['', Validators.required],
       ice: ['', [Validators.required, Validators.pattern(/^[0-9]{15}$/)]],
       telephone: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
       email: ['', [Validators.required, Validators.email]]
     });
 
-    this.filteredVilles = this.clientForm.get('ville')!.valueChanges.pipe(
+    this.filteredVilles = this.clientForm.get('ville_id')!.valueChanges.pipe(
       startWith(''),
       map(value => this._filterVilles(value || ''))
     );
@@ -79,6 +91,17 @@ export class FormClientComponent implements OnInit {
     this.loadClients();
     this.loadVilles();
     this.setupEventListeners();
+  }
+
+  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
+    this._paginator = value;
+    if (this._paginator) {
+      this.dataSource.paginator = this._paginator;
+    }
+  }
+
+  ngAfterViewInit() {
+    this.dataSource.paginator = this.paginator;
   }
 
   private setupEventListeners(): void {
@@ -107,16 +130,68 @@ export class FormClientComponent implements OnInit {
   }
 
   displayVille(ville: any): string {
-    return ville && ville.nom ? ville.nom : '';
+    return ville && ville.nom ? `${ville.nom} (${ville.codePostal})` : '';
   }
 
   loadClients(): void {
     this.isLoading = true;
     this.dataService.getClients().pipe(
       finalize(() => this.isLoading = false)
-    ).subscribe(
-      clients => this.clients = clients
-    );
+    ).subscribe({
+      next: (clientList) => {
+        this.clients = clientList;
+        this.dataSource = new MatTableDataSource<Client>(this.clients);
+        this.dataSource.paginator = this.paginator; // Réassigner le paginator après le chargement
+        this.appliquerFiltres();
+      },
+      error: (error) => {
+        console.error('Erreur chargement clients:', error);
+      }
+    });
+  }
+
+  // Méthodes pour les filtres
+  appliquerFiltres(): void {
+    let filteredData = this.clients;
+
+    if (this.filtreRaisonSociale) {
+      filteredData = filteredData.filter(client =>
+        client.raisonSociale.toLowerCase().includes(this.filtreRaisonSociale.toLowerCase())
+      );
+    }
+
+    if (this.filtreTelephone) {
+      filteredData = filteredData.filter(client =>
+        client.telephone.includes(this.filtreTelephone)
+      );
+    }
+
+    if (this.filtreEmail) {
+      filteredData = filteredData.filter(client =>
+        client.email.toLowerCase().includes(this.filtreEmail.toLowerCase())
+      );
+    }
+
+    if (this.filtreIce) {
+      filteredData = filteredData.filter(client =>
+        client.ice.includes(this.filtreIce)
+      );
+    }
+
+    this.dataSource.data = filteredData;
+
+    // Réinitialiser la pagination après filtrage
+    if (this.dataSource.paginator) {
+      this.dataSource.paginator.firstPage();
+    }
+  }
+
+  reinitialiserFiltres(): void {
+    this.filtreRaisonSociale = '';
+    this.filtreTelephone = '';
+    this.filtreEmail = '';
+    this.filtreIce = '';
+    this.appliquerFiltres();
   }
 
   onVilleSelected(event: any): void {
@@ -126,9 +201,7 @@ export class FormClientComponent implements OnInit {
 
     if (selectedVille) {
       this.clientForm.patchValue({
-        ville: selectedVille, // Affiche seulement le nom dans le champ
-        codePostal: selectedVille.codePostal,
-        region: selectedVille.region
+        ville_id: selectedVille.id
       });
     }
   }
@@ -159,6 +232,7 @@ export class FormClientComponent implements OnInit {
     this.isLoading = true;
     const clientData: Client = {
       ...this.clientForm.value,
+      ville: this.villes.find(v => v.id === this.clientForm.value.ville_id)
     };
 
     const operation$ = this.isEditMode
@@ -183,13 +257,10 @@ export class FormClientComponent implements OnInit {
     this.isEditMode = true;
     this.currentClientId = client.id;
 
-    // Préparation des données pour l'affichage
-    const formData = {
+    this.clientForm.patchValue({
       ...client,
-      ville: client.ville?.nom || client.ville // Gère le cas où ville est un objet ou juste le nom
-    };
-
-    this.clientForm.patchValue(formData);
+      ville_id: client.ville?.id
+    });
     this.scrollToForm();
   }
 
@@ -224,9 +295,7 @@ export class FormClientComponent implements OnInit {
   }
 
   resetForm(): void {
-    this.clientForm.reset({
-      pays: 'MAROC'
-    });
+    this.clientForm.reset();
     this.isEditMode = false;
     this.currentClientId = null;
   }

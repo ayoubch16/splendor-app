@@ -1,0 +1,32 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "category": "Impression publicitaire"
+    },
+    {
+      "id": 2,
+      "category": "Supports de communication"
+    },
+    {
+      "id": 3,
+      "category": "Création graphique"
+    },
+    {
+      "id": 4,
+      "category": "Développement web"
+    },
+    {
+      "id": 5,
+      "category": "Signalétique"
+    },
+    {
+      "id": 6,
+      "category": "Cartes et faire-parts"
+    },
+    {
+      "id": 7,
+      "category": "Impression grand format"
+    }
+  ]
+}

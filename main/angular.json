@@ -19,7 +19,9 @@
           "options": {
             "allowedCommonJsDependencies": [
               "apexcharts",
-              "bezier-easing"
+              "bezier-easing",
+              "core-js",
+              "canvg"
             ],
             "outputPath": {
               "base": "dist/materialm"

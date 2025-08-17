@@ -14,6 +14,7 @@ import {CommonModule} from "@angular/common";
 import {MatTableModule} from "@angular/material/table";
 import {MatIconModule} from "@angular/material/icon";
 import {MatTooltipModule} from "@angular/material/tooltip";
+import {AuthService} from "../../services/auth.service";
 
 @Component({
   selector: 'app-profil',
@@ -45,13 +46,14 @@ export class ProfilComponent implements OnInit {
     private fb: FormBuilder,
     private dataService: DataService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private authService: AuthService,
   ) {
     this.userForm = this.fb.group({
       username: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
-      firstName: [''],
-      lastName: [''],
+      first_name: [''],
+      last_name: [''],
       password: ['', [Validators.minLength(6)]],
       confirmPassword: ['']
     }, { validator: this.passwordMatchValidator });
@@ -79,14 +81,14 @@ export class ProfilComponent implements OnInit {
   }
 
   loadUserData() {
-    this.dataService.getUser(1).subscribe(
+    this.dataService.getUser(this.authService.getCurrentUser()?.id).subscribe(
       (user: User) => {
         this.isEditing = true;
         this.userForm.patchValue({
           username: user.username,
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
+          first_name: user.first_name,
+          last_name: user.last_name
         });
         this.initialFormValues = this.userForm.value;
       },
@@ -147,7 +149,7 @@ export class ProfilComponent implements OnInit {
     }
 
     const operation = this.isEditing
-      ? this.dataService.updateUser(1, userData)
+      ? this.dataService.updateUser(this.authService.getCurrentUser()?.id, userData)
       : this.dataService.saveUser(userData);
 
     operation.subscribe(

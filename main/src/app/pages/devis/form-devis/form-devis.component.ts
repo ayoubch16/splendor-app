@@ -1,12 +1,19 @@
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import {AfterViewInit, Component, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from "@angular/forms";
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from "@angular/material/autocomplete";
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { BehaviorSubject, map, Observable, startWith } from "rxjs";
+import {BehaviorSubject, map, Observable,  startWith} from "rxjs";
 import { finalize } from 'rxjs/operators';
 
-import { Article, ArticleTable, Client, Devis, StatutDevis, TypeDocument } from "../../../interfaces/entites";
+import {
+  Article,
+  ArticleTable,
+  Client,
+  Devis, EmailPayload,
+  StatutDevis,
+  TypeDocument
+} from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
 import { FormArticleComponent } from "../../articles/form-article/form-article.component";
 import { MatFormFieldModule } from "@angular/material/form-field";
@@ -14,20 +21,23 @@ import { MatSelectModule } from "@angular/material/select";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
 import { MatInputModule } from "@angular/material/input";
-import { MatTableModule } from "@angular/material/table";
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import {MatProgressSpinner, MatSpinner} from "@angular/material/progress-spinner";
 import { EventBusService } from "../../../services/event-bus.service";
 import { Event } from "../../../interfaces/EmitEvent";
-import { DownloadDevisComponent } from "../download-devis/download-devis.component";
-import { DownloadDevisPrintComponent } from "../download-devis-print/download-devis-print.component";
 import { PdfService } from "../../../services/pdf.service";
 import { ChangeStatusComponent } from "../../../components/change-status/change-status.component";
 import { SendEmailComponent } from "../../../components/send-email/send-email.component";
 import { PdfViewerModalComponent } from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
 import { ConfirmationModalComponent } from "../../../components/confirmation-modal/confirmation-modal.component";
+import {PdfV2Service} from "../../../services/pdfV2.service";
+import {DownloadDevisComponent} from "../download-devis/download-devis.component";
+import {DownloadDevisPrintComponent} from "../download-devis-print/download-devis-print.component";
+import {EmailService} from "../../../services/email.service";
+import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
 
 @Component({
   selector: 'app-form-devis',
@@ -47,14 +57,15 @@ import { ConfirmationModalComponent } from "../../../components/confirmation-mod
     MatSnackBarModule,
     MatSpinner,
     MatAutocompleteModule,
+    MatProgressSpinner,
     DownloadDevisComponent,
     DownloadDevisPrintComponent,
-    MatProgressSpinner
+    MatPaginatorModule,
   ],
   templateUrl: './form-devis.component.html',
   styleUrls: ['./form-devis.component.scss']
 })
-export class FormDevisComponent implements OnInit {
+export class FormDevisComponent implements OnInit, AfterViewInit {
   clients: Client[] = [];
   listeArticle: Article[] = [];
   listeDevis: Devis[] = [];
@@ -69,6 +80,7 @@ export class FormDevisComponent implements OnInit {
 
   selectedClient: Client | null = null;
   selectedArticle: Article | null = null;
+
   selectedClientId: number | null = null;
   selectedArticleId: number | null = null;
 
@@ -87,6 +99,14 @@ export class FormDevisComponent implements OnInit {
   articleEnEditionIndex = -1;
   isLoading = false;
 
+  // Propriétés pour les filtres
+  filtreNumero: string = '';
+  filtreClient: string = '';
+  filtreStatut: StatutDevis | null = null;
+  filtreDateDebut: string = '';
+  filtreDateFin: string = '';
+  statutsDevis: StatutDevis[] = Object.values(StatutDevis);
+
   @Output() articlesChanged = new EventEmitter<ArticleTable[]>();
 
   constructor(
@@ -94,7 +114,9 @@ export class FormDevisComponent implements OnInit {
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private eventBusService: EventBusService,
-    private pdfService: PdfService
+    private pdfService: PdfService,
+    private pdfV2Service: PdfV2Service,
+    private emailService: EmailService
   ) { }
 
   get articles(): ArticleTable[] {
@@ -160,13 +182,86 @@ export class FormDevisComponent implements OnInit {
     });
   }
 
+  dataSource: MatTableDataSource<Devis> = new MatTableDataSource<Devis>();
+  private _paginator!: MatPaginator;
+
+  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
+    this._paginator = value;
+    if (this._paginator) {
+      this.dataSource.paginator = this._paginator;
+    }
+  }
+  ngAfterViewInit() {
+    this.dataSource.paginator = this.paginator;
+  }
+
   loadDevis(): void {
     this.isLoading = true;
     this.dataService.getAllDevis().pipe(
       finalize(() => this.isLoading = false)
-    ).subscribe(devis => {
-      this.listeDevis = devis;
+    ).subscribe({
+      next: (devisList) => {
+        this.listeDevis = devisList;
+        this.appliquerFiltres();
+      },
+      error: (error) => {
+        console.error('Erreur chargement devis:', error);
+      }
     });
+  }
+
+  appliquerFiltres(): void {
+    if (!this.listeDevis || this.listeDevis.length === 0) {
+      this.dataSource.data = [];
+      return;
+    }
+
+    // Convertir en minuscules une seule fois
+    const searchNum = this.filtreNumero?.toLowerCase() || '';
+    const searchClient = this.filtreClient?.toLowerCase() || '';
+
+    // Convertir les dates
+    const dateDebut = this.filtreDateDebut ? new Date(this.filtreDateDebut) : null;
+    const dateFin = this.filtreDateFin ? new Date(this.filtreDateFin) : null;
+
+    this.dataSource.data = this.listeDevis.filter(devis => {
+      // Filtre par numéro
+      if (searchNum && !devis.numDevis?.toLowerCase().includes(searchNum)) {
+        return false;
+      }
+
+      // Filtre par client
+      if (searchClient && !devis.client?.raisonSociale?.toLowerCase().includes(searchClient)) {
+        return false;
+      }
+
+      // Filtre par statut
+      if (this.filtreStatut && devis.statut !== this.filtreStatut) {
+        return false;
+      }
+
+      // Filtre par date
+      if (dateDebut || dateFin) {
+        const dateDevis = new Date(devis.date);
+        if (dateDebut && dateDevis < dateDebut) return false;
+        if (dateFin && dateDevis > dateFin) return false;
+      }
+
+      return true;
+    });
+
+    if (this.dataSource.paginator) {
+      this.dataSource.paginator.firstPage();
+    }
+  }
+
+  reinitialiserFiltres(): void {
+    this.filtreNumero = '';
+    this.filtreClient = '';
+    this.filtreStatut = null;
+    this.filtreDateDebut = '';
+    this.filtreDateFin = '';
+    this.appliquerFiltres();
   }
 
   private _filterArticles(value: string): Article[] {
@@ -322,13 +417,14 @@ export class FormDevisComponent implements OnInit {
 
     this.isLoading = true;
 
-
+    this.calculerTotaux();
 
     const devis: Devis = {
       id: this.currentDevisId || undefined,
       numDevis: this.devisNumber,
       client: client,
-      montant: this.totalTTC.toFixed(2),
+      client_id:client.id,
+      montant: Number(this.totalTTC).toFixed(2),
       statut: StatutDevis.EN_ATTENTE,
       date: this.devisDate,
       articles: this.articles.map(article => ({
@@ -340,6 +436,7 @@ export class FormDevisComponent implements OnInit {
       }))
     };
 
+    console.log("devis : ",devis)
     const operation$ = this.currentDevisId
       ? this.dataService.updateDevis(this.currentDevisId, devis)
       : this.dataService.createDevis(devis);
@@ -491,7 +588,8 @@ export class FormDevisComponent implements OnInit {
 
   consulterDevis(devis: Devis): void {
     this.isLoading = true;
-    this.pdfService.generatePdf(devis)
+
+    this.pdfService.generatePdf(devis,{ type: TypeDocument.DEVIS, withSignature: false })
       .then(blob => {
         this.dialog.open(PdfViewerModalComponent, {
           width: '90%',
@@ -509,6 +607,10 @@ export class FormDevisComponent implements OnInit {
         this.isLoading = false;
         console.error(error);
       });
+  }
+
+  openPdf(documentId: number): void {
+    this.pdfV2Service.previewPdf('devis', documentId,false);
   }
 
   changerStatut(devis: Devis): void {
@@ -535,84 +637,8 @@ export class FormDevisComponent implements OnInit {
     });
   }
 
-  async genererFacture(devis: Devis): Promise<void> {
-    const factureDejaExistante = await this.factureExists(devis);
-
-    if (factureDejaExistante) {
-      const numFact = devis.numDevis.replace('DEV', 'FACT');
-      const confirmerNouvelleFacture = await this.openConfirmationDialog(
-        'Facture existante',
-        `Une facture existe déjà pour ce devis (${numFact}). Voulez-vous quand même créer une nouvelle facture?`
-      );
-
-      if (!confirmerNouvelleFacture) {
-        return;
-      }
-    }
-
-    const confirmed = await this.openConfirmationDialog(
-      'Générer facture',
-      `Voulez-vous générer une facture à partir du devis ${devis.numDevis} ?`
-    );
-
-    if (confirmed) {
-      this.isLoading = true;
-      this.dataService.createFacture(devis.id!)
-        .pipe(finalize(() => this.isLoading = false))
-        .subscribe({
-          next: () => {
-            this.showSuccessMessage('Facture générée avec succès');
-            this.loadDevis();
-          },
-          error: (error) => {
-            this.showErrorMessage(`Erreur: ${error.message}`);
-          }
-        });
-    }
-  }
-
-  factureExists(devis: Devis): Promise<boolean> {
-    return new Promise((resolve) => {
-      const numFact = devis.numDevis.replace('DEV', 'FACT');
-      this.dataService.checkFacture(numFact).subscribe({
-        next: (result) => resolve(result),
-        error: () => resolve(false)
-      });
-    });
-  }
-
-  envoyerParMail(devis: Devis): void {
-    const dialogRef = this.dialog.open(SendEmailComponent, {
-      width: '600px',
-      data: {
-        documentId: devis.id!,
-        documentNumber: devis.numDevis,
-        clientEmail: devis.client?.email,
-        typeDocument: TypeDocument.DEVIS
-      }
-    });
-
-    dialogRef.afterClosed().subscribe(resultEmail => {
-      if (resultEmail) {
-        this.isLoading = true;
-        this.dataService.sendDevisByEmail(devis.id!)
-          .pipe(finalize(() => this.isLoading = false))
-          .subscribe({
-            next: () => {
-              this.showSuccessMessage('Email envoyé avec succès');
-            },
-            error: (error) => {
-              this.showErrorMessage(`Erreur: ${error.message}`);
-            }
-          });
-      }
-    });
-  }
-
   async genererBonLivraison(devis: Devis): Promise<void> {
-    const blDejaExistant = await this.bonLivraisonExists(devis);
-
-    if (blDejaExistant) {
+    if (devis.blExistante) {
       const numBL = devis.numDevis.replace('DEV', 'BL');
       const confirmerNouveauBL = await this.openConfirmationDialog(
         'Bon de livraison existant',
@@ -645,14 +671,38 @@ export class FormDevisComponent implements OnInit {
     }
   }
 
-  bonLivraisonExists(devis: Devis): Promise<boolean> {
-    return new Promise((resolve) => {
-      const numBL = devis.numDevis.replace('DEV', 'BL');
-      this.dataService.checkBonLivraison(numBL).subscribe({
-        next: (result) => resolve(result),
-        error: () => resolve(false)
-      });
-    });
+  async genererFacture(devis: Devis): Promise<void> {
+    if (devis.factureExistante) {
+      const numFact = devis.numDevis.replace('DEV', 'FACT');
+      const confirmerNouvelleFacture = await this.openConfirmationDialog(
+        'Facture existante',
+        `Une facture existe déjà pour ce devis (${numFact}). Voulez-vous quand même créer une nouvelle facture?`
+      );
+
+      if (!confirmerNouvelleFacture) {
+        return;
+      }
+    }
+
+    const confirmed = await this.openConfirmationDialog(
+      'Générer facture',
+      `Voulez-vous générer une facture à partir du devis ${devis.numDevis} ?`
+    );
+
+    if (confirmed) {
+      this.isLoading = true;
+      this.dataService.createFacture(devis.id!)
+        .pipe(finalize(() => this.isLoading = false))
+        .subscribe({
+          next: () => {
+            this.showSuccessMessage('Facture générée avec succès');
+            this.loadDevis();
+          },
+          error: (error) => {
+            this.showErrorMessage(`Erreur: ${error.message}`);
+          }
+        });
+    }
   }
 
   private openConfirmationDialog(title: string, message: string): Promise<boolean> {
@@ -663,4 +713,103 @@ export class FormDevisComponent implements OnInit {
     return dialogRef.afterClosed().toPromise();
   }
 
+  downloadDocumentPdf(type: 'devis'|'facture'|'bl', id: number,imprimable:boolean): void {
+    this.pdfV2Service.downloadPdf(type,id,imprimable)
+  }
+
+  formatNumberForDisplay(value: any): number {
+    if (typeof value === 'number') return value;
+
+    const stringValue = String(value).replace(/[^0-9.]/g, '');
+    const parts = stringValue.split('.');
+    const cleanValue = parts.length > 1
+      ? `${parts[0]}.${parts.slice(1).join('')}`
+      : parts[0];
+
+    return parseFloat(cleanValue) || 0;
+  }
+
+  async envoyerParMail(devis: Devis): Promise<void> {
+    const dialogRef = this.dialog.open(SendEmailComponent, {
+      width: '600px',
+      data: {
+        documentId: devis.id!,
+        documentNumber: devis.numDevis,
+        clientEmail: devis.client?.email,
+        typeDocument: TypeDocument.DEVIS,
+        options: {
+          imprimable: true
+        }
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(async (resultEmail) => {
+      if (resultEmail) {
+        this.isLoading = true;
+
+        try {
+          let pdfBase64 = '';
+          let fileName = '';
+
+          if (resultEmail.options?.imprimable) {
+            this.showInfoMessage('Génération du PDF en cours...');
+
+            const pdfOptions = {
+              type: TypeDocument.DEVIS,
+              withSignature: true,
+              printVersion: true
+            };
+
+            const pdfBlob = await this.pdfService.generatePdf(devis, pdfOptions);
+            pdfBase64 = await this.blobToBase64(pdfBlob);
+            fileName = `devis-${devis.numDevis}.pdf`;
+          }
+
+          const payload: EmailPayload = {
+            email: resultEmail.email,
+            subject: resultEmail.subject || `Devis ${devis.numDevis}`,
+            message: resultEmail.message || `Veuillez trouver ci-joint notre devis n°${devis.numDevis}.`,
+            imprimable: resultEmail.options?.imprimable || false,
+            pdfBase64: pdfBase64,
+            fileName: fileName
+          };
+
+          this.dataService.sendDevisByEmail(devis.id!, payload)
+            .pipe(finalize(() => this.isLoading = false))
+            .subscribe({
+              next: (response) => {
+                if (response.success) {
+                  this.showSuccessMessage('Email envoyé avec succès');
+                } else {
+                  this.showErrorMessage(`Erreur: ${response.message}`);
+                }
+              },
+              error: (error) => {
+                this.showErrorMessage(`Erreur lors de l'envoi: ${error.message}`);
+              }
+            });
+
+        } catch (error) {
+          this.isLoading = false;
+          this.showErrorMessage(`Erreur lors de la génération du PDF:`);
+        }
+      }
+    });
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = (reader.result as string).split(',')[1];
+        resolve(base64String);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  private showInfoMessage(message: string): void {
+    console.info('Info:', message);
+  }
 }

@@ -2,7 +2,8 @@
 export interface Article {
   id: number;
   unite: string;
-  categoryArticle: CategoryArticle;
+  categoryArticle:CategoryArticle
+  categoryId: number;
   nameArticle: string;
   descriptionArticle: string;
   priceArticle: number;
@@ -61,11 +62,16 @@ export interface CategoryArticle {
   category: string;
 }
 
+export interface CategoriesData {
+  categories: CategoryArticle[];
+}
+
 export interface Client {
   id: number;
   raisonSociale: string;
   adresse: string;
-  ville: Ville;
+  ville_id: number;
+  ville?:Ville
   ice: string;
   telephone: string;
   email: string;
@@ -75,16 +81,20 @@ export interface Devis {
   id?: number;
   numDevis: string;
   client: Client;
+  client_id?: number;
   montant: string;
   statut: StatutDevis;
   date: string;
-  articles: ArticleTable[];
+  articles: ArticleTableDevis[];
+  factureExistante?:boolean
+  blExistante?:boolean
 }
 
 export interface Facture {
   id?: number;
   numFacture?: string;
   client: Client;
+  client_id?: number;
   montant: string;
   statut: StatutFacture;
   date: string;
@@ -96,8 +106,8 @@ export interface User {
   username: string;
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   isActive: boolean;
   role: string;
 }
@@ -109,11 +119,31 @@ export interface Ville {
   region: string;
 }
 
+export interface VillesData {
+  villes: Ville[];
+}
+
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
 }
 
+export interface AuthResponse {
+  token: string;
+  user: {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+    first_name: string;
+    last_name: string;
+  };
+}
+
+export interface InfromationPdf {
+  type:string,
+  id:number
+}
 
 
 
@@ -125,27 +155,20 @@ export enum TypeDocument {
 }
 
 export enum StatutFacture {
-  BROUILLON = 'BROUILLON',
   NON_PAYEE = 'NON_PAYEE',
   PARTIELLEMENT_PAYEE = 'PARTIELLEMENT_PAYEE',
   PAYEE = 'PAYEE',
-  ANNULEE = 'ANNULEE',
-  EN_RETARD = 'EN_RETARD'
 }
 
 export enum StatutDevis {
   EN_ATTENTE = 'EN_ATTENTE',
   ACCEPTE = 'ACCEPTE',
   REFUSE = 'REFUSE',
-  EXPIRE = 'EXPIRE',
 }
 
 export enum StatutBL {
-  EN_PREPARATION = 'EN_PREPARATION',
   LIVRE = 'LIVRE',
-  PARTIELLEMENT_LIVRE = 'PARTIELLEMENT_LIVRE',
-  ANNULE = 'ANNULE',
-  FACTURE = 'FACTURE'
+  NON_LIVRE = 'NON_LIVRE',
 }
 
 export enum ERole {
@@ -156,4 +179,24 @@ export enum ERole {
   ROLE_VENDEUR = 'ROLE_VENDEUR',
   ROLE_COMPTABLE = 'ROLE_COMPTABLE',
   ROLE_COMMERCIAL = 'ROLE_COMMERCIAL'
+}
+
+export interface PdfDocument {
+  id: number;
+  reference: string;
+  client:Client
+}
+
+export interface EmailPayload {
+  email: string;
+  subject: string;
+  message: string;
+  imprimable: boolean;
+  pdfBase64?: string; // PDF encodé en base64
+  fileName?: string;
+}
+
+export interface EmailResponse {
+  success: boolean;
+  message: string;
 }

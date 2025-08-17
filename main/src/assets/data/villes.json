@@ -1,0 +1,76 @@
+{
+  "villes": [
+    {
+      "id": 1,
+      "nom": "Casablanca",
+      "codePostal": "20000",
+      "region": "Casablanca-Settat"
+    },
+    {
+      "id": 2,
+      "nom": "Rabat",
+      "codePostal": "10000",
+      "region": "Rabat-Salé-Kénitra"
+    },
+    {
+      "id": 3,
+      "nom": "Fès",
+      "codePostal": "30000",
+      "region": "Fès-Meknès"
+    },
+    {
+      "id": 4,
+      "nom": "Marrakech",
+      "codePostal": "40000",
+      "region": "Marrakech-Safi"
+    },
+    {
+      "id": 5,
+      "nom": "Agadir",
+      "codePostal": "80000",
+      "region": "Souss-Massa"
+    },
+    {
+      "id": 6,
+      "nom": "Tanger",
+      "codePostal": "90000",
+      "region": "Tanger-Tétouan-Al Hoceïma"
+    },
+    {
+      "id": 7,
+      "nom": "Meknès",
+      "codePostal": "50000",
+      "region": "Fès-Meknès"
+    },
+    {
+      "id": 8,
+      "nom": "Oujda",
+      "codePostal": "60000",
+      "region": "Oriental"
+    },
+    {
+      "id": 9,
+      "nom": "Kenitra",
+      "codePostal": "14000",
+      "region": "Rabat-Salé-Kénitra"
+    },
+    {
+      "id": 10,
+      "nom": "Tétouan",
+      "codePostal": "93000",
+      "region": "Tanger-Tétouan-Al Hoceïma"
+    },
+    {
+      "id": 11,
+      "nom": "Salé",
+      "codePostal": "11000",
+      "region": "Rabat-Salé-Kénitra"
+    },
+    {
+      "id": 12,
+      "nom": "Mohammedia",
+      "codePostal": "20650",
+      "region": "Casablanca-Settat"
+    }
+  ]
+}

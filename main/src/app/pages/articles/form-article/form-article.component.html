@@ -25,12 +25,12 @@
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">Catégorie*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
-            <mat-select formControlName="categoryArticle">
-              <mat-option *ngFor="let category of categories | async" [value]="category">
+            <mat-select formControlName="categoryId">
+              <mat-option *ngFor="let category of categories | async" [value]="category.id">
                 {{ category.category }}
               </mat-option>
             </mat-select>
-            <mat-error *ngIf="articleForm.get('categoryArticle')?.hasError('required')">
+            <mat-error *ngIf="articleForm.get('categoryId')?.hasError('required')">
               Ce champ est obligatoire
             </mat-error>
           </mat-form-field>

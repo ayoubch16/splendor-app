@@ -52,7 +52,7 @@ export class FullComponent implements OnDestroy {
   private htmlElement!: HTMLHtmlElement;
 
   get isOver(): boolean {
-    return this.isMobileScreen;
+    return false;
   }
 
   constructor(

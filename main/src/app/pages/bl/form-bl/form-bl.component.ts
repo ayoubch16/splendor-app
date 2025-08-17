@@ -1,11 +1,11 @@
-import {Component, OnInit} from '@angular/core';
+import {AfterViewInit, Component, OnInit, ViewChild} from '@angular/core';
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatSelectModule} from "@angular/material/select";
 import {FormsModule, ReactiveFormsModule} from "@angular/forms";
 import {MatButtonModule} from "@angular/material/button";
 import {MatCardModule} from "@angular/material/card";
 import {MatInputModule} from "@angular/material/input";
-import {MatTableModule} from "@angular/material/table";
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {CommonModule} from "@angular/common";
 import {MatIconModule} from '@angular/material/icon';
 import {MatMenuModule} from '@angular/material/menu';
@@ -21,9 +21,9 @@ import {MatSpinner} from "@angular/material/progress-spinner";
 import {DownloadBlComponent} from "../download-bl/download-bl.component";
 import {DownloadBlPrintComponent} from "../download-bl-print/download-bl-print.component";
 import {ChangeStatusComponent} from "../../../components/change-status/change-status.component";
-import {SendEmailComponent} from "../../../components/send-email/send-email.component";
 import {PdfService} from "../../../services/pdf.service";
 import {PdfViewerModalComponent} from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
+import {MatPaginator} from "@angular/material/paginator";
 
 @Component({
   selector: 'app-form-bl',
@@ -44,15 +44,24 @@ import {PdfViewerModalComponent} from "../../../components/pdf-viewer-modal/pdf-
     MatSpinner,
     DownloadBlComponent,
     DownloadBlPrintComponent,
+    MatPaginator,
   ],
   templateUrl: './form-bl.component.html'
 })
-export class FormBlComponent implements OnInit {
+export class FormBlComponent implements OnInit, AfterViewInit {
   clients: Client[] = [];
   listeArticle: Article[] = [];
   listeBls: Bl[] = [];
   public articlesSubject = new BehaviorSubject<ArticleTable[]>([]);
   articles$: Observable<ArticleTable[]> = this.articlesSubject.asObservable();
+
+  // Propriétés pour les filtres
+  filtreNumero: string = '';
+  filtreClient: string = '';
+  filtreStatut: StatutBL | null = null;
+  filtreDateDebut: string = '';
+  filtreDateFin: string = '';
+  statutsBL: StatutBL[] = Object.values(StatutBL);
 
   get articles(): ArticleTable[] {
     return this.articlesSubject.value;
@@ -69,15 +78,18 @@ export class FormBlComponent implements OnInit {
   clientName: string;
   selectedClientId: number | null = null;
   blDate: string = new Date().toISOString().split('T')[0];
-  blNumber= '';
+  blNumber = '';
   currentBlId: number | null = null;
   isEditMode = false;
+
+  dataSource: MatTableDataSource<Bl> = new MatTableDataSource<Bl>();
+  private _paginator!: MatPaginator;
 
   constructor(
     private dataService: DataService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-    private pdfService:PdfService
+    private pdfService: PdfService
   ) { }
 
   ngOnInit(): void {
@@ -90,6 +102,18 @@ export class FormBlComponent implements OnInit {
     this.loadBls();
   }
 
+  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
+    this._paginator = value;
+    if (this._paginator) {
+      this.dataSource.paginator = this._paginator;
+    }
+  }
+
+  ngAfterViewInit() {
+    this.dataSource.paginator = this.paginator;
+  }
+
+  // Méthodes de chargement des données
   loadClients(): void {
     this.isLoading = true;
     this.dataService.getClients().pipe(
@@ -112,32 +136,76 @@ export class FormBlComponent implements OnInit {
     this.isLoading = true;
     this.dataService.getBls().pipe(
       finalize(() => this.isLoading = false)
-    ).subscribe(bls => {
-      this.listeBls = bls;
-    });
-  }
-
-  ouvrirFormulaireArticle(): void {
-    const dialogRef = this.dialog.open(FormArticleComponent, {
-      width: '800px',
-      data: {}
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.loadArticles();
+    ).subscribe({
+      next: (blList) => {
+        this.listeBls = blList;
+        this.appliquerFiltres();
+      },
+      error: (error) => {
+        console.error('Erreur chargement BLs:', error);
       }
     });
   }
 
-  onArticleSelected(event: any): void {
-    const selectedArticle: Article = event.value;
-    this.nouvelArticle.description = selectedArticle.descriptionArticle;
-    this.nouvelArticle.designation = selectedArticle.nameArticle;
-    this.nouvelArticle.prixUnitaire = selectedArticle.priceArticle;
-    this.calculerTotal();
+  // Méthodes pour les filtres
+  appliquerFiltres(): void {
+    if (!this.listeBls) return;
+
+    // Convertir les dates une seule fois
+    const dateDebut = this.filtreDateDebut ? new Date(this.filtreDateDebut) : null;
+    const dateFin = this.filtreDateFin ? new Date(this.filtreDateFin) : null;
+
+    // Normaliser les chaînes de recherche
+    const searchNumero = this.filtreNumero?.toLowerCase() || '';
+    const searchClient = this.filtreClient?.toLowerCase() || '';
+
+    this.dataSource.data = this.listeBls.filter(bl => {
+      // Filtre par numéro
+      if (searchNumero && !bl.numBl?.toLowerCase().includes(searchNumero)) {
+        return false;
+      }
+
+      // Filtre par client
+      if (searchClient && !bl.client?.raisonSociale?.toLowerCase().includes(searchClient)) {
+        return false;
+      }
+
+      // Filtre par statut
+      if (this.filtreStatut && bl.statut !== this.filtreStatut) {
+        return false;
+      }
+
+      // Filtre par date
+      if (dateDebut || dateFin) {
+        const dateBl = new Date(bl.date);
+
+        if (dateDebut && dateBl < dateDebut) {
+          return false;
+        }
+
+        if (dateFin && dateBl > dateFin) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    if (this.dataSource.paginator) {
+      this.dataSource.paginator.firstPage();
+    }
   }
 
+  reinitialiserFiltres(): void {
+    this.filtreNumero = '';
+    this.filtreClient = '';
+    this.filtreStatut = null;
+    this.filtreDateDebut = '';
+    this.filtreDateFin = '';
+    this.appliquerFiltres();
+  }
+
+  // Méthodes pour la gestion des articles
   initialiserNouvelArticle(): ArticleTable {
     return {
       designation: '',
@@ -146,6 +214,14 @@ export class FormBlComponent implements OnInit {
       prixUnitaire: 0,
       prixTotal: 0
     };
+  }
+
+  onArticleSelected(event: any): void {
+    const selectedArticle: Article = event.value;
+    this.nouvelArticle.description = selectedArticle.descriptionArticle;
+    this.nouvelArticle.designation = selectedArticle.nameArticle;
+    this.nouvelArticle.prixUnitaire = selectedArticle.priceArticle;
+    this.calculerTotal();
   }
 
   calculerTotal(): void {
@@ -186,9 +262,10 @@ export class FormBlComponent implements OnInit {
     // Pas de calcul de total pour les BLs (optionnel selon besoin)
   }
 
+  // Méthodes pour la gestion des BLs
   enregistrerBl(): void {
     if (!this.selectedClientId || this.articles.length === 0) {
-      alert('Veuillez sélectionner un client et ajouter au moins un article');
+      this.showErrorMessage('Veuillez sélectionner un client et ajouter au moins un article');
       return;
     }
 
@@ -200,7 +277,7 @@ export class FormBlComponent implements OnInit {
       id: this.currentBlId || 0,
       numBl: this.blNumber,
       client: client,
-      statut: StatutBL.EN_PREPARATION,
+      statut: StatutBL.NON_LIVRE,
       date: this.blDate,
       articles: this.articles.map(article => ({
         designation: article.designation,
@@ -211,14 +288,14 @@ export class FormBlComponent implements OnInit {
       }))
     };
 
-    this.dataService.updateBl(this.currentBlId!,bl).pipe(
+    this.dataService.updateBl(this.currentBlId!, bl).pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
       next: () => {
         this.showSuccessMessage('BL modifié avec succès');
         this.loadBls();
       },
-      error: (error: { message: any; }) => {
+      error: (error) => {
         this.showErrorMessage(`Erreur: ${error.message}`);
       }
     });
@@ -228,7 +305,7 @@ export class FormBlComponent implements OnInit {
     this.isEditMode = true;
     this.currentBlId = bl.id;
     this.selectedClientId = bl.client.id;
-    this.clientName = bl.client.raisonSociale
+    this.clientName = bl.client.raisonSociale;
     this.blDate = bl.date;
     this.blNumber = bl.numBl;
 
@@ -257,7 +334,7 @@ export class FormBlComponent implements OnInit {
             this.resetForm();
           }
         },
-        error: (error: { message: any; }) => {
+        error: (error) => {
           this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
         }
       });
@@ -273,6 +350,54 @@ export class FormBlComponent implements OnInit {
     this.isEditMode = false;
   }
 
+  // Méthodes pour les PDF
+  consulterBl(bl: Bl): void {
+    this.isLoading = true;
+    this.pdfService.generatePdf(bl, { type: TypeDocument.BL, withSignature: false })
+      .then(blob => {
+        this.dialog.open(PdfViewerModalComponent, {
+          width: '90%',
+          maxWidth: '1000px',
+          data: {
+            title: `BL ${bl.numBl}`,
+            pdfBlob: blob,
+            filename: `BL_${bl.numBl}.pdf`
+          }
+        });
+        this.isLoading = false;
+      })
+      .catch(error => {
+        this.showErrorMessage('Erreur lors de la génération du PDF');
+        this.isLoading = false;
+        console.error(error);
+      });
+  }
+
+  changerStatut(bl: Bl): void {
+    const dialogRef = this.dialog.open(ChangeStatusComponent, {
+      width: '400px',
+      data: { currentStatus: bl.statut, blId: bl.id!, documentType: TypeDocument.BL }
+    });
+
+    dialogRef.afterClosed().subscribe(newStatus => {
+      if (newStatus) {
+        this.isLoading = true;
+        this.dataService.updateBlStatut(bl.id!, newStatus)
+          .pipe(finalize(() => this.isLoading = false))
+          .subscribe({
+            next: () => {
+              this.showSuccessMessage('Statut mis à jour avec succès');
+              this.loadBls();
+            },
+            error: (error) => {
+              this.showErrorMessage(`Erreur: ${error.message}`);
+            }
+          });
+      }
+    });
+  }
+
+  // Méthodes utilitaires
   private scrollToForm(): void {
     const formElement = document.querySelector('.cardWithShadow');
     if (formElement) {
@@ -294,78 +419,15 @@ export class FormBlComponent implements OnInit {
     });
   }
 
-  changerStatut(bl: Bl): void {
-    const dialogRef = this.dialog.open(ChangeStatusComponent, {
-      width: '400px',
-      data: { currentStatus: bl.statut, blId: bl.id!,documentType: TypeDocument.BL }
-    });
+  formatNumberForDisplay(value: any): number {
+    if (typeof value === 'number') return value;
 
-    dialogRef.afterClosed().subscribe(newStatus => {
-      if (newStatus) {
-        console.log("newStatus : "+newStatus)
-        this.isLoading = true;
-        this.dataService.updateBlStatut(bl.id!, newStatus)
-          .pipe(finalize(() => this.isLoading = false))
-          .subscribe({
-            next: () => {
-              this.showSuccessMessage('Statut mis à jour avec succès');
-              this.loadBls();
-            },
-            error: (error) => {
-              this.showErrorMessage(`Erreur: ${error.message}`);
-            }
-          });
-      }
-    });
-  }
+    const stringValue = String(value).replace(/[^0-9.]/g, '');
+    const parts = stringValue.split('.');
+    const cleanValue = parts.length > 1
+      ? `${parts[0]}.${parts.slice(1).join('')}`
+      : parts[0];
 
-  envoyerParMail(bl: Bl): void {
-    const dialogRef = this.dialog.open(SendEmailComponent, {
-      width: '600px',
-      data: {
-        documentId: bl.id!,
-        documentNumber: bl.numBl,
-        clientEmail: bl.client?.email,
-        typeDocument: TypeDocument.BL
-      }
-    });
-
-    dialogRef.afterClosed().subscribe(resultEmail => {
-      if (resultEmail) {
-        this.isLoading = true;
-        this.dataService.sendDevisByEmail(bl.id!)
-          .pipe(finalize(() => this.isLoading = false))
-          .subscribe({
-            next: () => {
-              this.showSuccessMessage('Email envoyé avec succès');
-            },
-            error: (error) => {
-              this.showErrorMessage(`Erreur: ${error.message}`);
-            }
-          });
-      }
-    });
-  }
-
-  consulterBl(bl: Bl): void {
-    this.isLoading = true;
-    this.pdfService.generatePdf(bl)
-      .then(blob => {
-        this.dialog.open(PdfViewerModalComponent, {
-          width: '90%',
-          maxWidth: '1000px',
-          data: {
-            title: `BL ${bl.numBl}`,
-            pdfBlob: blob,
-            filename: `BL_${bl.numBl}.pdf`
-          }
-        });
-        this.isLoading = false;
-      })
-      .catch(error => {
-        this.showErrorMessage('Erreur lors de la génération du PDF');
-        this.isLoading = false;
-        console.error(error);
-      });
+    return parseFloat(cleanValue) || 0;
   }
 }

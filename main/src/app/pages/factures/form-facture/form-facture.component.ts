@@ -1,11 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import {AfterViewInit, Component, OnInit, ViewChild} from '@angular/core';
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatSelectModule } from "@angular/material/select";
 import { FormsModule, ReactiveFormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
 import { MatInputModule } from "@angular/material/input";
-import { MatTableModule } from "@angular/material/table";
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -25,6 +25,7 @@ import {DownloadFactureComponent} from "../download-facture/download-facture.com
 import {DownloadFacturePrintComponent} from "../download-facture-print/download-facture-print.component";
 import {ChangeStatusComponent} from "../../../components/change-status/change-status.component";
 import {SendEmailComponent} from "../../../components/send-email/send-email.component";
+import {MatPaginator} from "@angular/material/paginator";
 
 @Component({
   selector: 'app-form-facture',
@@ -44,17 +45,26 @@ import {SendEmailComponent} from "../../../components/send-email/send-email.comp
     MatSnackBarModule,
     MatSpinner,
     DownloadFactureComponent,
-    DownloadFacturePrintComponent
+    DownloadFacturePrintComponent,
+    MatPaginator
   ],
   templateUrl: './form-facture.component.html',
   styleUrls: ['./form-facture.component.scss']
 })
-export class FormFactureComponent implements OnInit {
+export class FormFactureComponent implements OnInit, AfterViewInit {
   clients: Client[] = [];
   listeArticle: Article[] = [];
   listeFactures: Facture[] = [];
   public articlesSubject = new BehaviorSubject<ArticleTable[]>([]);
   articles$: Observable<ArticleTable[]> = this.articlesSubject.asObservable();
+
+  // Propriétés pour les filtres
+  filtreNumero: string = '';
+  filtreClient: string = '';
+  filtreStatut: StatutFacture | null = null;
+  filtreDateDebut: string = '';
+  filtreDateFin: string = '';
+  statutsFacture: StatutFacture[] = Object.values(StatutFacture);
 
   get articles(): ArticleTable[] {
     return this.articlesSubject.value;
@@ -71,12 +81,22 @@ export class FormFactureComponent implements OnInit {
   articleEnEditionIndex = -1;
   isLoading = false;
 
-  clientName: string ;
+  clientName: string;
   selectedClientId: number | null = null;
   factureDate = new Date().toISOString().split('T')[0];
   factureNumber = '';
   currentFactureId: number | null = null;
   isEditMode = false;
+
+  dataSource: MatTableDataSource<Facture> = new MatTableDataSource<Facture>();
+  private _paginator!: MatPaginator;
+
+  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
+    this._paginator = value;
+    if (this._paginator) {
+      this.dataSource.paginator = this._paginator;
+    }
+  }
 
   constructor(
     private dataService: DataService,
@@ -96,6 +116,11 @@ export class FormFactureComponent implements OnInit {
     this.loadFactures();
   }
 
+  ngAfterViewInit() {
+    this.dataSource.paginator = this.paginator;
+  }
+
+  // Méthodes de chargement des données
   loadClients(): void {
     this.isLoading = true;
     this.dataService.getClients().pipe(
@@ -118,32 +143,76 @@ export class FormFactureComponent implements OnInit {
     this.isLoading = true;
     this.dataService.getFactures().pipe(
       finalize(() => this.isLoading = false)
-    ).subscribe(factures => {
-      this.listeFactures = factures;
-    });
-  }
-
-  ouvrirFormulaireArticle(): void {
-    const dialogRef = this.dialog.open(FormArticleComponent, {
-      width: '800px',
-      data: {}
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.loadArticles();
+    ).subscribe({
+      next: (factureList) => {
+        this.listeFactures = factureList;
+        this.appliquerFiltres();
+      },
+      error: (error) => {
+        console.error('Erreur chargement Facture:', error);
       }
     });
   }
 
-  onArticleSelected(event: any): void {
-    const selectedArticle: Article = event.value;
-    this.nouvelArticle.description = selectedArticle.descriptionArticle;
-    this.nouvelArticle.designation = selectedArticle.nameArticle;
-    this.nouvelArticle.prixUnitaire = selectedArticle.priceArticle;
-    this.calculerTotal();
+  // Méthodes pour les filtres
+  appliquerFiltres(): void {
+    if (!this.listeFactures) return;
+
+    // Convertir les dates une seule fois
+    const dateDebut = this.filtreDateDebut ? new Date(this.filtreDateDebut) : null;
+    const dateFin = this.filtreDateFin ? new Date(this.filtreDateFin) : null;
+
+    // Normaliser les chaînes de recherche
+    const searchNumero = this.filtreNumero?.toLowerCase() || '';
+    const searchClient = this.filtreClient?.toLowerCase() || '';
+
+    this.dataSource.data = this.listeFactures.filter(facture => {
+      // Filtre par numéro
+      if (searchNumero && !facture.numFacture?.toLowerCase().includes(searchNumero)) {
+        return false;
+      }
+
+      // Filtre par client
+      if (searchClient && !facture.client?.raisonSociale?.toLowerCase().includes(searchClient)) {
+        return false;
+      }
+
+      // Filtre par statut
+      if (this.filtreStatut && facture.statut !== this.filtreStatut) {
+        return false;
+      }
+
+      // Filtre par date
+      if (dateDebut || dateFin) {
+        const dateFacture = new Date(facture.date);
+
+        if (dateDebut && dateFacture < dateDebut) {
+          return false;
+        }
+
+        if (dateFin && dateFacture > dateFin) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    if (this.dataSource.paginator) {
+      this.dataSource.paginator.firstPage();
+    }
   }
 
+  reinitialiserFiltres(): void {
+    this.filtreNumero = '';
+    this.filtreClient = '';
+    this.filtreStatut = null;
+    this.filtreDateDebut = '';
+    this.filtreDateFin = '';
+    this.appliquerFiltres();
+  }
+
+  // Méthodes pour la gestion des articles
   initialiserNouvelArticle(): ArticleTable {
     return {
       designation: '',
@@ -152,6 +221,14 @@ export class FormFactureComponent implements OnInit {
       prixUnitaire: 0,
       prixTotal: 0
     };
+  }
+
+  onArticleSelected(event: any): void {
+    const selectedArticle: Article = event.value;
+    this.nouvelArticle.description = selectedArticle.descriptionArticle;
+    this.nouvelArticle.designation = selectedArticle.nameArticle;
+    this.nouvelArticle.prixUnitaire = selectedArticle.priceArticle;
+    this.calculerTotal();
   }
 
   calculerTotal(): void {
@@ -195,9 +272,10 @@ export class FormFactureComponent implements OnInit {
     this.totalTTC = this.totalHT + this.tva;
   }
 
+  // Méthodes pour la gestion des factures
   enregistrerFacture(): void {
     if (!this.selectedClientId || this.articles.length === 0) {
-      alert('Veuillez sélectionner un client et ajouter au moins un article');
+      this.showErrorMessage('Veuillez sélectionner un client et ajouter au moins un article');
       return;
     }
 
@@ -209,7 +287,7 @@ export class FormFactureComponent implements OnInit {
       id: this.currentFactureId!,
       numFacture: this.factureNumber,
       client: client,
-      montant: this.totalTTC.toFixed(2),
+      montant: Number(this.totalTTC).toFixed(2),
       statut: StatutFacture.NON_PAYEE,
       date: this.factureDate,
       articles: this.articles.map(article => ({
@@ -220,18 +298,15 @@ export class FormFactureComponent implements OnInit {
         prixTotal: article.prixTotal
       }))
     };
-    console.log("length avant :"+facture.articles.length)
 
-    this.dataService.updateFacture(this.currentFactureId!,facture).pipe(
+    this.dataService.updateFacture(this.currentFactureId!, facture).pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
       next: () => {
         this.showSuccessMessage('Facture modifiée avec succès');
-        console.log("length apres :"+facture.articles.length)
-
         this.loadFactures();
       },
-      error: (error: { message: any; }) => {
+      error: (error) => {
         this.showErrorMessage(`Erreur: ${error.message}`);
       }
     });
@@ -239,11 +314,11 @@ export class FormFactureComponent implements OnInit {
 
   editFacture(facture: Facture): void {
     this.isEditMode = true;
-    this.currentFactureId! = facture.id!;
-    this.clientName=facture.client.raisonSociale
+    this.currentFactureId = facture.id!;
+    this.clientName = facture.client.raisonSociale;
     this.selectedClientId = facture.client.id;
     this.factureDate = facture.date;
-    this.factureNumber! = facture.numFacture!;
+    this.factureNumber = facture.numFacture!;
 
     const articles: ArticleTable[] = facture.articles.map(article => ({
       designation: article.designation,
@@ -270,7 +345,7 @@ export class FormFactureComponent implements OnInit {
             this.resetForm();
           }
         },
-        error: (error: { message: any; }) => {
+        error: (error) => {
           this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
         }
       });
@@ -290,6 +365,101 @@ export class FormFactureComponent implements OnInit {
     return !!this.selectedClientId && this.articles.length > 0;
   }
 
+  // Méthodes pour les PDF et emails
+  viewFacturePdf(facture: Facture): void {
+    this.isLoading = true;
+    this.pdfService.generatePdf(facture, { type: TypeDocument.FACTURE, withSignature: false })
+      .then(blob => {
+        this.dialog.open(PdfViewerModalComponent, {
+          width: '90%',
+          maxWidth: '1000px',
+          data: {
+            title: `Facture ${facture.numFacture}`,
+            pdfBlob: blob,
+            filename: `Facture_${facture.numFacture}.pdf`
+          }
+        });
+        this.isLoading = false;
+      })
+      .catch(error => {
+        this.showErrorMessage('Erreur lors de la génération du PDF');
+        this.isLoading = false;
+        console.error(error);
+      });
+  }
+
+  changerStatut(facture: Facture): void {
+    const dialogRef = this.dialog.open(ChangeStatusComponent, {
+      data: {
+        currentStatus: facture.statut,
+        documentId: facture.id,
+        documentType: TypeDocument.FACTURE
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(newStatus => {
+      if (newStatus) {
+        this.isLoading = true;
+        this.dataService.updateFactureStatut(facture.id!, newStatus)
+          .pipe(finalize(() => this.isLoading = false))
+          .subscribe({
+            next: () => {
+              this.showSuccessMessage('Statut mis à jour avec succès');
+              this.loadFactures();
+            },
+            error: (error) => {
+              this.showErrorMessage(`Erreur: ${error.message}`);
+            }
+          });
+      }
+    });
+  }
+
+  envoyerParMail(facture: Facture): void {
+    const dialogRef = this.dialog.open(SendEmailComponent, {
+      width: '600px',
+      data: {
+        documentId: facture.id!,
+        documentNumber: facture.numFacture,
+        clientEmail: facture.client?.email,
+        typeDocument: TypeDocument.FACTURE
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(resultEmail => {
+      if (resultEmail) {
+        this.isLoading = true;
+        this.pdfService.generatePdf(facture, { type: TypeDocument.FACTURE, withSignature: true })
+          .then(pdfBlob => {
+            const pdfFile = new File([pdfBlob], `facture_${facture.numFacture}.pdf`);
+
+            this.dataService.sendEmailAsJson(
+              {
+                to: resultEmail.email,
+                subject: resultEmail.subject || `Facture ${facture.numFacture}`,
+                message: resultEmail.message || `Veuillez trouver ci-joint notre facture n°${facture.numFacture}.`
+              },
+              pdfFile
+            ).pipe(finalize(() => this.isLoading = false))
+              .subscribe({
+                next: () => {
+                  this.showSuccessMessage('Email envoyé avec succès');
+                },
+                error: (error) => {
+                  console.error('Erreur complète:', error);
+                  this.showErrorMessage(`Erreur lors de l'envoi: ${error.message}`);
+                }
+              });
+          })
+          .catch(error => {
+            this.isLoading = false;
+            this.showErrorMessage('Erreur lors de la génération du PDF');
+          });
+      }
+    });
+  }
+
+  // Méthodes utilitaires
   private scrollToForm(): void {
     const formElement = document.querySelector('.cardWithShadow');
     if (formElement) {
@@ -311,130 +481,15 @@ export class FormFactureComponent implements OnInit {
     });
   }
 
-  viewFacturePdf(facture: Facture): void {
-    this.isLoading = true;
-    this.pdfService.generatePdf(facture)
-        .then(blob => {
-        this.dialog.open(PdfViewerModalComponent, {
-          width: '90%',
-          maxWidth: '1000px',
-          data: {
-            title: `Facture ${facture.numFacture}`,
-            pdfBlob: blob,
-            filename: `Facture_${facture.numFacture}.pdf`
-          }
-        });
-      this.isLoading = false;
-      })
-      .catch(error => {
-        this.showErrorMessage('Erreur lors de la génération du PDF');
-        this.isLoading = false;
-        console.error(error);
-      });
+  formatNumberForDisplay(value: any): number {
+    if (typeof value === 'number') return value;
+
+    const stringValue = String(value).replace(/[^0-9.]/g, '');
+    const parts = stringValue.split('.');
+    const cleanValue = parts.length > 1
+      ? `${parts[0]}.${parts.slice(1).join('')}`
+      : parts[0];
+
+    return parseFloat(cleanValue) || 0;
   }
-
-
-  changerStatut(facture: any) {
-    const dialogRef = this.dialog.open(ChangeStatusComponent, {
-      data: {
-        currentStatus: facture.status,
-        documentId: facture.id,
-        documentType: TypeDocument.FACTURE
-      }
-    });
-
-    dialogRef.afterClosed().subscribe(newStatus => {
-      if (newStatus) {
-              console.log("newStatus : "+newStatus)
-              this.isLoading = true;
-              this.dataService.updateFactureStatut(facture.id!, newStatus)
-                .pipe(finalize(() => this.isLoading = false))
-                .subscribe({
-                  next: () => {
-                    this.showSuccessMessage('Statut mis à jour avec succès');
-                    this.loadFactures();
-                  },
-                  error: (error) => {
-                    this.showErrorMessage(`Erreur: ${error.message}`);
-                  }
-                });
-      }
-    });
-  }
-
-  // Modifiez temporairement votre méthode envoyerParMail
-  // envoyerParMail(facture: Facture): void {
-  //   const dialogRef = this.dialog.open(SendEmailComponent, {
-  //     width: '600px',
-  //     data: {
-  //             documentId: facture.id!,
-  //             documentNumber: facture.numFacture,
-  //             clientEmail: facture.client?.email,
-  //             typeDocument: TypeDocument.FACTURE
-  //     }
-  //   });
-  //
-  //   dialogRef.afterClosed().subscribe(resultEmail => {
-  //     if (resultEmail) {
-  //       this.isLoading = true;
-  //
-  //       // TEST SIMPLE SANS FICHIER
-  //       this.dataService.sendSimpleEmail({
-  //         to: resultEmail.email,
-  //         subject: resultEmail.subject,
-  //         message: resultEmail.message
-  //       }).pipe(finalize(() => this.isLoading = false))
-  //         .subscribe({
-  //           next: () => this.showSuccessMessage('Email envoyé avec succès'),
-  //           error: (error) => {
-  //             console.error('Erreur complète:', error);
-  //             this.showErrorMessage(`Erreur: ${error.message}`);
-  //           }
-  //         });
-  //     }
-  //   });
-  // }
-
-  envoyerParMail(facture: Facture): void {
-    const dialogRef = this.dialog.open(SendEmailComponent, {
-      width: '600px',
-      data: {
-        documentId: facture.id!,
-        documentNumber: facture.numFacture,
-        clientEmail: facture.client?.email,
-        typeDocument: TypeDocument.FACTURE
-      }
-    });
-
-    dialogRef.afterClosed().subscribe(resultEmail => {
-      if (resultEmail) {
-        this.isLoading = true;
-
-        // Supposons que vous avez récupéré le PDF sous forme de Blob
-        const pdfBlob = new Blob([/* contenu PDF */], { type: 'application/pdf' });
-        const pdfFile = new File([pdfBlob], `facture_${facture.numFacture}.pdf`);
-
-        this.dataService.sendEmailAsJson(
-          {
-            to: resultEmail.email,
-            subject: resultEmail.subject,
-            message: resultEmail.message
-          },
-          pdfFile
-        ).pipe(finalize(() => this.isLoading = false))
-          .subscribe({
-              next: () => {
-                this.showSuccessMessage('Email envoyé avec succès');
-              },
-              error: (error) => {
-                console.error('Erreur complète:', error);
-                this.showErrorMessage(`Erreur lors de l'envoi: ${error.message}`);
-              }
-            });
-
-      }
-    });
-  }
-
-
 }

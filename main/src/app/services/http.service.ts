@@ -7,7 +7,10 @@ import { finalize } from "rxjs/operators";
   providedIn: 'root',
 })
 export class HttpService {
-  base_url = 'http://localhost:8080';
+
+  // base_url = 'http://localhost:8000';
+  // base_url = 'https://devchoukri.com/splendor/api/index.php';
+  base_url = 'https://splendorart.ma/app/api/index.php';
 
   constructor(
     private httpClient: HttpClient,
@@ -63,7 +66,7 @@ export class HttpService {
         try {
           return typeof response === 'string' && response.trim() ? JSON.parse(response) : response;
         } catch (e) {
-          return response;
+          return e;
         }
       }),
       catchError(error => {

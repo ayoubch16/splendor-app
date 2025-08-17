@@ -30,40 +30,13 @@
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">Ville*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
-            <input type="text" matInput placeholder="Ville" formControlName="ville" [matAutocomplete]="autoVille">
+            <input type="text" matInput placeholder="Ville" formControlName="ville_id" [matAutocomplete]="autoVille">
             <mat-autocomplete #autoVille="matAutocomplete" [displayWith]="displayVille" (optionSelected)="onVilleSelected($event)">
               <mat-option *ngFor="let ville of filteredVilles | async" [value]="ville">
-                {{ville.nom}} ({{ville.codePostal}})
+                {{ ville.nom }} ({{ ville.codePostal }})
               </mat-option>
             </mat-autocomplete>
-          </mat-form-field>
-        </div>
-
-        <div class="col-lg-6">
-          <mat-label class="f-w-600 m-b-8 d-block">Code Postal*</mat-label>
-          <mat-form-field appearance="outline" class="w-100">
-            <input matInput formControlName="codePostal" placeholder="Code Postal" readonly />
-            <mat-error *ngIf="clientForm.get('codePostal')?.hasError('required')">
-              Ce champ est obligatoire
-            </mat-error>
-          </mat-form-field>
-        </div>
-
-        <div class="col-lg-6">
-          <mat-label class="f-w-600 m-b-8 d-block">Region*</mat-label>
-          <mat-form-field appearance="outline" class="w-100">
-            <input matInput formControlName="region" placeholder="Region" readonly />
-            <mat-error *ngIf="clientForm.get('region')?.hasError('required')">
-              Ce champ est obligatoire
-            </mat-error>
-          </mat-form-field>
-        </div>
-
-        <div class="col-lg-6">
-          <mat-label class="f-w-600 m-b-8 d-block">Pays*</mat-label>
-          <mat-form-field appearance="outline" class="w-100">
-            <input matInput formControlName="pays" placeholder="Pays" readonly />
-            <mat-error *ngIf="clientForm.get('pays')?.hasError('required')">
+            <mat-error *ngIf="clientForm.get('ville_id')?.hasError('required')">
               Ce champ est obligatoire
             </mat-error>
           </mat-form-field>
@@ -72,15 +45,16 @@
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">ICE*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
-            <input matInput formControlName="ice" placeholder="ICE ( chiffres)" />
+            <input matInput formControlName="ice" placeholder="ICE (15 chiffres)" />
             <mat-error *ngIf="clientForm.get('ice')?.hasError('required')">
               Ce champ est obligatoire
             </mat-error>
             <mat-error *ngIf="clientForm.get('ice')?.hasError('pattern')">
-              L'ICE doit contenir 7 chiffres
+              L'ICE doit contenir 15 chiffres
             </mat-error>
           </mat-form-field>
         </div>
+
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">Téléphone*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
@@ -93,6 +67,7 @@
             </mat-error>
           </mat-form-field>
         </div>
+
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">Email*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
@@ -108,10 +83,11 @@
       </div>
 
       <div class="m-t-12">
-        <button mat-flat-button color="primary" class="m-r-8" type="submit" [disabled]="clientForm.invalid">
-          {{ isEditMode ? 'Modifier' : 'Ajouter' }}
+        <button mat-flat-button color="primary" class="m-r-8" type="submit" [disabled]="clientForm.invalid || isLoading">
+          <span *ngIf="!isLoading">{{ isEditMode ? 'Modifier' : 'Ajouter' }}</span>
+          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
         </button>
-        <button mat-stroked-button color="warn" type="button" (click)="resetForm()">
+        <button mat-stroked-button color="warn" type="button" (click)="resetForm()" [disabled]="isLoading">
           Annuler
         </button>
       </div>
@@ -119,23 +95,58 @@
   </mat-card-content>
 </mat-card>
 
-<!-- Tableau des clients -->
+<!-- Tableau des clients avec filtres -->
 <mat-card class="cardWithShadow theme-card m-t-16">
   <mat-card-header>
     <mat-card-title class="m-b-0">Liste des Clients</mat-card-title>
   </mat-card-header>
   <mat-card-content>
-    <table mat-table [dataSource]="clients" class="w-100">
+    <!-- Section filtres -->
+    <div class="row m-b-16">
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Raison Sociale</mat-label>
+          <input matInput [(ngModel)]="filtreRaisonSociale" (input)="appliquerFiltres()"
+                 placeholder="Filtrer par raison sociale">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Téléphone</mat-label>
+          <input matInput [(ngModel)]="filtreTelephone" (input)="appliquerFiltres()"
+                 placeholder="Filtrer par téléphone">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Email</mat-label>
+          <input matInput [(ngModel)]="filtreEmail" (input)="appliquerFiltres()"
+                 placeholder="Filtrer par email">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>ICE</mat-label>
+          <input matInput [(ngModel)]="filtreIce" (input)="appliquerFiltres()"
+                 placeholder="Filtrer par ICE">
+        </mat-form-field>
+      </div>
+    </div>
+
+    <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
       <!-- Colonne Raison Sociale -->
       <ng-container matColumnDef="raisonSociale">
         <th mat-header-cell *matHeaderCellDef>Raison Sociale</th>
         <td mat-cell *matCellDef="let client">{{ client.raisonSociale }}</td>
       </ng-container>
 
-      <!-- Colonne Ville -->
+      <!-- Colonne Adresse -->
       <ng-container matColumnDef="adresse">
         <th mat-header-cell *matHeaderCellDef>Adresse</th>
-        <td mat-cell *matCellDef="let client">{{ client.ville.nom }}</td>
+        <td mat-cell *matCellDef="let client">{{ client.adresse }}</td>
       </ng-container>
 
       <!-- Colonne ICE -->
@@ -172,5 +183,10 @@
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
+    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]"
+                   showFirstLastButtons
+                   [length]="dataSource.filteredData.length"
+                   [pageSize]="5">
+    </mat-paginator>
   </mat-card-content>
 </mat-card>

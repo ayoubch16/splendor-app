@@ -1,17 +1,17 @@
 import { Injectable } from "@angular/core";
 import { HttpClient } from '@angular/common/http';
-import { Observable} from "rxjs";
+import {map, Observable} from "rxjs";
 import {
   Article,
   ArticleTableDevis,
-  Bl,
+  Bl, CategoriesData,
   CategoryArticle,
   Client,
-  Devis,
+  Devis, EmailPayload,
   Facture,
   StatutBL, StatutDevis, StatutFacture,
   User,
-  Ville
+  Ville, VillesData
 } from "../interfaces/entites";
 import {endpoints} from "../const/endpoints";
 import {HttpService} from "./http.service";
@@ -38,8 +38,6 @@ export class DataService {
   }
 
   saveArticle(article: Article): Observable<Article> {
-    console.log("article :"+JSON.stringify(article));
-    console.log("endpoints all :   "+endpoints.article.create);
     return this.httpService.post(endpoints.article.create, article)
   }
 
@@ -52,9 +50,26 @@ export class DataService {
   }
 
 
-  getCategories(): Observable<CategoryArticle[]> {
+  getCategoriesFromAPI(): Observable<CategoryArticle[]> {
     return this.httpService.get(endpoints.article.listcategories)
   }
+
+  getCategories(): Observable<CategoryArticle[]> {
+    return this.http.get<CategoriesData>('assets/data/categories.json')
+      .pipe(
+        map(data => data.categories)
+      );
+  }
+
+  getNameCategory(id: number): Observable<string | null> {
+    return this.getCategories().pipe(
+      map(categories => {
+        const found = categories.find(cat => cat.id === id);
+        return found ? found.category : null;
+      })
+    );
+  }
+
 
 
 
@@ -80,9 +95,23 @@ export class DataService {
     return this.httpService.delete(endpoints.client.delete(id));
   }
 
-
   getVilles(): Observable<Ville[]> {
-    return this.httpService.get(endpoints.client.listVilles)
+    return this.http.get<VillesData>('assets/data/villes.json')
+      .pipe(
+        map(data => data.villes)
+      );
+  }
+
+  getVilleById(id: number): Observable<Ville> {
+    return this.getVilles().pipe(
+      map(villes => {
+        const ville = villes.find(v => v.id === id);
+        if (!ville) {
+          throw new Error(`Ville avec l'ID ${id} non trouvée`);
+        }
+        return ville;
+      })
+    );
   }
 
 
@@ -103,8 +132,8 @@ export class DataService {
     return this.httpService.get(endpoints.shared.getCptClient)
   }
 
-  sendDevisByEmail(id: number) {
-    return this.httpService.post(endpoints.shared.sendDevisByEmail, null)
+  sendDevisByEmail(id: number,  payload: EmailPayload) {
+    return this.httpService.post(endpoints.devis.sendDevisByEmail(id), payload)
   }
 
   sendEmail(formData: FormData) {
@@ -130,27 +159,6 @@ export class DataService {
     });
   }
 
-  sendSimpleEmail(emailData: {to: string, subject: string, message: string}): Observable<any> {
-    return this.http.post(endpoints.shared.sendSimple, emailData, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  checkFacture(num : string): Observable<boolean> {
-    return this.httpService.get(endpoints.shared.checkFacture(num))
-  }
-
-  checkBonLivraison(num : string): Observable<boolean> {
-    return this.httpService.get(endpoints.shared.checkBl(num))
-  }
-
-  checkDevis(num : string): Observable<boolean> {
-    return this.httpService.get(endpoints.shared.checkDevis(num))
-  }
-
-  checkBl(num : string): Observable<boolean> {
-    return this.httpService.get(endpoints.shared.checkBl(num))
-  }
 
   //************************* User ***************************************//
   getUser(id:number): Observable<User> {
@@ -179,7 +187,7 @@ export class DataService {
   }
 
   getDevisArticles(id: number): Observable<ArticleTableDevis[]> {
-    return this.httpService.get(endpoints.devis.getArticles(id))
+    return this.httpService.get(endpoints.devis.getOne(id))
   }
 
   createDevis(devisData: Devis): Observable<Devis> {
@@ -198,13 +206,6 @@ export class DataService {
     return this.httpService.delete(endpoints.devis.delete(id))
   }
 
-  getLastDevisId(): Observable<number> {
-    return this.httpService.get(endpoints.devis.getLastId)
-  }
-
-  getLastDevis(): Observable<Devis> {
-    return this.httpService.get(endpoints.devis.getLast)
-  }
 
 
   //************************* Facture ***************************************//
@@ -226,7 +227,9 @@ export class DataService {
   }
 
   updateFactureStatut(id: number, statut: StatutFacture): Observable<Facture> {
-    return this.httpService.put(endpoints.facture.updateStatut(id,statut),null)
+    console.log("id :"+id)
+    console.log("statut :"+statut)
+    return this.httpService.put(endpoints.facture.updateStatut(id,statut), {})
   }
 
 
@@ -250,6 +253,14 @@ export class DataService {
 
   updateBlStatut(id: number, statut: StatutBL): Observable<Bl> {
     return this.httpService.put(endpoints.bl.updateStatut(id,statut),null)
+  }
+
+
+
+  //************************* PDF ***************************************//
+
+  genererPDF(data: { id: number; type: string }): Observable<void> {
+    return this.httpService.post(endpoints.file.genererPDF, data);
   }
 
 

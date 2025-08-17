@@ -34,7 +34,7 @@
         <div class="row m-b-16">
           <div class="col-lg-2">
             <mat-form-field appearance="outline" class="w-100">
-              <mat-select (selectionChange)="onArticleSelected($event)">
+              <mat-select (selectionChange)="onArticleSelected($event)" name="articleSelect">
                 <mat-option value="">-- Sélectionner un article --</mat-option>
                 @for (option of listeArticle ; track option.id) {
                   <mat-option [value]="option">
@@ -129,15 +129,15 @@
             <mat-card class="p-16">
               <div class="d-flex justify-content-between m-b-8">
                 <span>Total HT:</span>
-                <span class="f-w-600">{{totalHT | number:'1.2-2'}} DH</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalHT) | number:'1.2-2'}} DH</span>
               </div>
               <div class="d-flex justify-content-between m-b-8">
                 <span>TVA (20%):</span>
-                <span class="f-w-600">{{tva | number:'1.2-2'}} DH</span>
+                <span class="f-w-600">{{formatNumberForDisplay(tva) | number:'1.2-2'}} DH</span>
               </div>
               <div class="d-flex justify-content-between">
                 <span class="f-w-600">Total TTC:</span>
-                <span class="f-w-600">{{totalTTC | number:'1.2-2'}} DH</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalTTC) | number:'1.2-2'}} DH</span>
               </div>
             </mat-card>
           </div>
@@ -156,11 +156,62 @@
       </div>
     </form>
 
+    <!-- Section filtres -->
+    <h3 class="m-t-32 m-b-10  ">Filtrer les factures</h3>
+    <div class="row ">
+
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Numéro</mat-label>
+          <input matInput [(ngModel)]="filtreNumero" name="filtreNumero"
+                 (input)="appliquerFiltres()" placeholder="Rechercher par numéro">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Client</mat-label>
+          <input matInput [(ngModel)]="filtreClient" name="filtreClient"
+                 (input)="appliquerFiltres()" placeholder="Rechercher par client">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Statut</mat-label>
+          <mat-select [(ngModel)]="filtreStatut" name="filtreStatut"
+                      (selectionChange)="appliquerFiltres()">
+            <mat-option [value]="null">Tous</mat-option>
+            @for (statut of statutsFacture; track statut) {
+              <mat-option [value]="statut">{{ statut }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Date de début</mat-label>
+          <input matInput [(ngModel)]="filtreDateDebut" name="filtreDateDebut"
+                 type="date" (change)="appliquerFiltres()">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Date de fin</mat-label>
+          <input matInput [(ngModel)]="filtreDateFin" name="filtreDateFin"
+                 type="date" (change)="appliquerFiltres()">
+        </mat-form-field>
+      </div>
+    </div>
+
     <!-- Liste des factures existantes -->
     <div class="m-t-32">
       <h3>Liste des factures</h3>
 
-      <table mat-table [dataSource]="listeFactures" class="w-100 mat-elevation-z1">
+      <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
         <!-- Numéro Facture -->
         <ng-container matColumnDef="numFacture">
           <th mat-header-cell *matHeaderCellDef>Numéro</th>
@@ -213,9 +264,9 @@
               </button>
               <app-download-facture [facture]="element"></app-download-facture>
               <app-download-facture-print [facture]="element"></app-download-facture-print>
-<!--              <button mat-menu-item (click)="envoyerParMail(element)">-->
-<!--                <mat-icon>email</mat-icon> Envoyer Par mail-->
-<!--              </button>-->
+              <button mat-menu-item (click)="envoyerParMail(element)">
+                <mat-icon>email</mat-icon> Envoyer Par mail
+              </button>
             </mat-menu>
           </td>
         </ng-container>
@@ -223,6 +274,7 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
       </table>
+      <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
     </div>
   </mat-card-content>
 </mat-card>

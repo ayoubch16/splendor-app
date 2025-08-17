@@ -1,5 +1,7 @@
 <div class="col-lg-12" style="margin-bottom: 30px">
-  <h2>Bonjour {{user?.firstName}} {{user?.lastName}}</h2>
+  <div *ngIf="authService.isLoggedIn()">
+    Bonjour {{ authService.getCurrentUser()?.first_name }}  {{ authService.getCurrentUser()?.last_name }}
+  </div>
 </div>
 <div class="row">
   <div class="col-lg-4">
@@ -20,10 +22,10 @@
 
 </div>
 <div class="col-lg-12">
-    <app-derniers-fichiers typeDocument="FACTURE"></app-derniers-fichiers>
+  <app-derniers-fichiers typeDocument="DEVIS"></app-derniers-fichiers>
 </div>
 <div class="col-lg-12">
-    <app-derniers-fichiers typeDocument="DEVIS"></app-derniers-fichiers>
+    <app-derniers-fichiers typeDocument="FACTURE"></app-derniers-fichiers>
 </div>
 <div class="col-lg-12">
     <app-derniers-fichiers typeDocument="BL"></app-derniers-fichiers>

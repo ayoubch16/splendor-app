@@ -5,12 +5,12 @@
     </mat-card-title>
   </mat-card-header>
   <mat-card-content>
-    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+    <form [formGroup]="loginForm" (ngSubmit)="login()">
       <mat-form-field appearance="outline">
         <mat-label>Email</mat-label>
-        <input matInput formControlName="email" type="email">
-        <mat-error *ngIf="f['email'].errors?.['required']">Email est requis</mat-error>
-        <mat-error *ngIf="f['email'].errors?.['email']">Email invalide</mat-error>
+        <input matInput formControlName="username" type="text">
+<!--        <mat-error *ngIf="f['email'].errors?.['required']">Email est requis</mat-error>-->
+<!--        <mat-error *ngIf="f['email'].errors?.['email']">Email invalide</mat-error>-->
       </mat-form-field>
 
       <mat-form-field appearance="outline">

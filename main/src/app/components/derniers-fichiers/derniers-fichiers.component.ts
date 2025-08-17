@@ -60,14 +60,6 @@ export class DerniersFichiersComponent implements OnInit {
 
 
 
-  download(element: any): void {
-    console.log('Télécharger', element);
-  }
-
-  print(element: any): void {
-    console.log('Imprimer', element);
-  }
-
   // Exemples de données (à remplacer par des appels API)
    getSampleFactures(): Observable<Facture[]> {
     return this.dataService.getFactures()
@@ -95,4 +87,15 @@ export class DerniersFichiersComponent implements OnInit {
         return 'bg-info';    // Couleur par défaut
     }
   }
+  getDisplayedColumns(): string[] {
+    const baseColumns = ['numero', 'client', 'statut', 'date', 'actions'];
+
+    // Ajoute la colonne montant seulement si ce n'est pas un BL
+    if (this.typeDocument !== 'BL') {
+      baseColumns.splice(2, 0, 'montant'); // Insère 'montant' après 'client'
+    }
+
+    return baseColumns;
+  }
+
 }

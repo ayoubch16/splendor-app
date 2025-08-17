@@ -32,7 +32,7 @@
         <div class="row m-b-16">
           <div class="col-lg-2">
             <mat-form-field appearance="outline" class="w-100">
-              <mat-select (selectionChange)="onArticleSelected($event)">
+              <mat-select (selectionChange)="onArticleSelected($event)" name="articleSelect">
                 <mat-option value="">-- Sélectionner un article --</mat-option>
                 @for (option of listeArticle ; track option.id) {
                   <mat-option [value]="option">
@@ -135,11 +135,62 @@
       </div>
     </form>
 
+    <!-- Section filtres -->
+    <h3 class=" m-t-32 m-b-16">Filtrer les BLs</h3>
+    <div class="row">
+
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Numéro</mat-label>
+          <input matInput [(ngModel)]="filtreNumero" name="filtreNumero"
+                 (input)="appliquerFiltres()" placeholder="Rechercher par numéro">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Client</mat-label>
+          <input matInput [(ngModel)]="filtreClient" name="filtreClient"
+                 (input)="appliquerFiltres()" placeholder="Rechercher par client">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Statut</mat-label>
+          <mat-select [(ngModel)]="filtreStatut" name="filtreStatut"
+                      (selectionChange)="appliquerFiltres()">
+            <mat-option [value]="null">Tous</mat-option>
+            @for (statut of statutsBL; track statut) {
+              <mat-option [value]="statut">{{ statut }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Date de début</mat-label>
+          <input matInput [(ngModel)]="filtreDateDebut" name="filtreDateDebut"
+                 type="date" (change)="appliquerFiltres()">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Date de fin</mat-label>
+          <input matInput [(ngModel)]="filtreDateFin" name="filtreDateFin"
+                 type="date" (change)="appliquerFiltres()">
+        </mat-form-field>
+      </div>
+    </div>
+
     <!-- Liste des BLs existants -->
     <div class="m-t-32">
       <h3>Liste des BLs</h3>
 
-      <table mat-table [dataSource]="listeBls" class="w-100 mat-elevation-z1">
+      <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
         <!-- Numéro BL -->
         <ng-container matColumnDef="numBl">
           <th mat-header-cell *matHeaderCellDef>Numéro</th>
@@ -186,9 +237,6 @@
               </button>
               <app-download-bl [bl]="element"></app-download-bl>
               <app-download-bl-print [bl]="element"></app-download-bl-print>
-<!--              <button mat-menu-item (click)="envoyerParMail(element)">-->
-<!--                <mat-icon>email</mat-icon> Envoyer Par mail-->
-<!--              </button>-->
             </mat-menu>
           </td>
         </ng-container>
@@ -196,6 +244,7 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
       </table>
+      <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
     </div>
   </mat-card-content>
 </mat-card>
