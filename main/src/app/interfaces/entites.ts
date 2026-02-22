@@ -55,6 +55,7 @@ export interface Bl {
   statut: StatutBL;
   date: string;
   articles: ArticleTableBl[];
+  numBC?:string;
 }
 
 export interface CategoryArticle {
@@ -99,6 +100,7 @@ export interface Facture {
   statut: StatutFacture;
   date: string;
   articles: ArticleTableFacture[];
+  numBC?:string;
 }
 
 export interface User {
@@ -199,4 +201,36 @@ export interface EmailPayload {
 export interface EmailResponse {
   success: boolean;
   message: string;
+}
+
+export interface TraceOperation {
+  id?: number;
+  timestamp: Date;
+  operationType: OperationType;
+  entityType: EntityType;
+  entityId: number;
+  userId: number;
+  userName: string;
+  details: string;
+  previousState?: any;
+  newState?: any;
+}
+
+export enum OperationType {
+  CREATE = 'CREATE',
+  UPDATE = 'UPDATE',
+  DELETE = 'DELETE',
+  READ = 'READ',
+  STATUS_CHANGE = 'STATUS_CHANGE',
+  EMAIL_SENT = 'EMAIL_SENT',
+  PDF_GENERATED = 'PDF_GENERATED'
+}
+
+export enum EntityType {
+  DEVIS = 'DEVIS',
+  CLIENT = 'CLIENT',
+  ARTICLE = 'ARTICLE',
+  FACTURE = 'FACTURE',
+  BON_LIVRAISON = 'BON_LIVRAISON',
+  USER = 'USER'
 }

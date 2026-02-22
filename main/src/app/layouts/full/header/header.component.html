@@ -1,34 +1,3 @@
-<!--<mat-toolbar class="topbar gap-8">-->
-<!--  &lt;!&ndash; Mobile Menu &ndash;&gt;-->
-<!--  @if(!showToggle) {-->
-<!--  <button mat-icon-button (click)="toggleMobileNav.emit()" class="d-flex justify-content-center">-->
-<!--    <i class="iconify icon-20 d-flex" data-icon="solar:hamburger-menu-line-duotone"></i>-->
-<!--  </button>-->
-<!--  }-->
-<!--  &lt;!&ndash; -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; &ndash;&gt;-->
-<!--  &lt;!&ndash; Notification Dropdown &ndash;&gt;-->
-<!--  &lt;!&ndash; -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; &ndash;&gt;-->
-<!--  <button mat-icon-button aria-label="Notifications" [matMenuTriggerFor]="menu" class="d-flex align-items-center justify-content-center">-->
-<!--  </button>-->
-<!--  <mat-menu #menu="matMenu">-->
-<!--  </mat-menu>-->
-
-<!--  <span class="flex-1-auto"></span>-->
-
-<!--  &lt;!&ndash; -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; &ndash;&gt;-->
-<!--  &lt;!&ndash; profile Dropdown &ndash;&gt;-->
-<!--  &lt;!&ndash; -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; &ndash;&gt;-->
-<!--  <button mat-icon-button extended [matMenuTriggerFor]="profilemenu" aria-label="Notifications"-->
-<!--    class="d-flex align-items-center justify-content-center profile-btn-dd">-->
-<!--    <img src="/assets/images/profile/user-1.jpg" alt="user 1" class="rounded-circle object-cover icon-35 profile-dd" width="35" />-->
-<!--  </button>-->
-<!--  <mat-menu #profilemenu="matMenu" class="topbar-dd cardWithShadow">-->
-<!--    <div class="p-x-12 m-t-12">-->
-<!--      <button mat-stroked-button (click)="logout()" class="w-100">Logout</button>-->
-<!--    </div>-->
-<!--  </mat-menu>-->
-<!--</mat-toolbar>-->
-
 <mat-toolbar class="topbar gap-8">
   <!-- Mobile Burger Menu (visible uniquement sur mobile) -->
   <button
@@ -40,17 +9,7 @@
     <i class="iconify icon-20" data-icon="solar:hamburger-menu-line-duotone"></i>
   </button>
 
-  <!-- --------------------------------------------------------------- -->
-  <!-- Notification Dropdown -->
-  <!-- --------------------------------------------------------------- -->
-<!--  <button-->
-<!--    mat-icon-button-->
-<!--    aria-label="Notifications"-->
-<!--    [matMenuTriggerFor]="menu"-->
-<!--    class="d-flex align-items-center justify-content-center"-->
-<!--  >-->
-<!--    <i class="iconify icon-20" data-icon="solar:bell-bing-line-duotone"></i>-->
-<!--  </button>-->
+
   <mat-menu #menu="matMenu">
     <!-- Ton contenu ici -->
   </mat-menu>
@@ -67,7 +26,7 @@
     class="d-flex align-items-center justify-content-center profile-btn-dd"
   >
     <img
-      src="/assets/images/profile/user-1.jpg"
+      src="https://splendorart.ma/boss-120x120.png"
       alt="user 1"
       class="rounded-circle object-cover icon-35 profile-dd"
       width="35"

@@ -8,9 +8,9 @@ import { finalize } from "rxjs/operators";
 })
 export class HttpService {
 
-  // base_url = 'http://localhost:8000';
+  base_url = 'http://localhost:8000';
   // base_url = 'https://devchoukri.com/splendor/api/index.php';
-  base_url = 'https://splendorart.ma/app/api/index.php';
+  // base_url = 'https://splendorart.ma/app/api/index.php';
 
   constructor(
     private httpClient: HttpClient,

@@ -1,0 +1,48 @@
+<h2 mat-dialog-title>
+  <mat-icon>info</mat-icon>
+  Détails de l'opération
+</h2>
+
+<mat-dialog-content>
+  <div class="details-grid">
+    <div class="detail-item">
+      <strong>ID:</strong> {{data.operation.id}}
+    </div>
+    <div class="detail-item">
+      <strong>Date:</strong> {{formatDate(data.operation.timestamp)}}
+    </div>
+    <div class="detail-item">
+      <strong>Type d'opération:</strong> {{data.operation.operationType}}
+    </div>
+    <div class="detail-item">
+      <strong>Type d'entité:</strong> {{data.operation.entityType}}
+    </div>
+    <div class="detail-item">
+      <strong>ID Entité:</strong> {{data.operation.entityId}}
+    </div>
+    <div class="detail-item">
+      <strong>Utilisateur:</strong> {{data.operation.userName}} (ID: {{data.operation.userId}})
+    </div>
+    <div class="detail-item full-width">
+      <strong>Détails:</strong> {{data.operation.details}}
+    </div>
+
+    @if (data.operation.previousState) {
+      <div class="full-width">
+        <strong>État précédent:</strong>
+        <pre class="json-block">{{data.operation.previousState | json}}</pre>
+      </div>
+    }
+
+    @if (data.operation.newState) {
+      <div class="full-width">
+        <strong>Nouvel état:</strong>
+        <pre class="json-block">{{data.operation.newState | json}}</pre>
+      </div>
+    }
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Fermer</button>
+</mat-dialog-actions>

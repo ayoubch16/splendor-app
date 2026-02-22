@@ -137,5 +137,12 @@ mat-paginator {
     font-weight: 500;
   }
 }
+.text-muted {
+  color: #6c757d;
+  font-style: italic;
+}
 
-
+/* Style pour les cellules N/A */
+.mat-cell .text-muted {
+  opacity: 0.6;
+}

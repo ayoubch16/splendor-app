@@ -3,7 +3,7 @@ import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from "@angular/
 import { DataService } from "../../services/data.service";
 import {MatDialog, MatDialogModule} from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
-import { User } from "../../interfaces/entites";
+import { EntityType, OperationType, User } from "../../interfaces/entites";
 import {ConfirmationModalComponent} from "../../components/confirmation-modal/confirmation-modal.component";
 import {MatCardModule} from "@angular/material/card";
 import {MatButtonModule} from "@angular/material/button";
@@ -15,6 +15,7 @@ import {MatTableModule} from "@angular/material/table";
 import {MatIconModule} from "@angular/material/icon";
 import {MatTooltipModule} from "@angular/material/tooltip";
 import {AuthService} from "../../services/auth.service";
+import {TraceabilityService} from "../../services/traceability.service";
 
 @Component({
   selector: 'app-profil',
@@ -33,7 +34,6 @@ import {AuthService} from "../../services/auth.service";
     MatTooltipModule,
     MatDialogModule
   ],
-  // ... vos imports existants
 })
 export class ProfilComponent implements OnInit {
   hideNewPassword = true;
@@ -48,6 +48,7 @@ export class ProfilComponent implements OnInit {
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private authService: AuthService,
+    private traceabilityService: TraceabilityService
   ) {
     this.userForm = this.fb.group({
       username: ['', Validators.required],
@@ -66,6 +67,27 @@ export class ProfilComponent implements OnInit {
       if (!this.initialFormValues) {
         this.initialFormValues = this.userForm.value;
       }
+    });
+  }
+
+  private logOperation(
+    operationType: OperationType,
+    entityId: number,
+    details: string,
+    previousState?: any,
+    newState?: any
+  ): void {
+    const user = this.authService.getCurrentUser()!;
+
+    this.traceabilityService.logOperation({
+      operationType,
+      entityType: EntityType.USER,
+      entityId,
+      userId: user?.id || 0,
+      userName: user?.first_name + ' ' + user?.last_name || 'Unknown',
+      details,
+      previousState,
+      newState
     });
   }
 
@@ -148,16 +170,41 @@ export class ProfilComponent implements OnInit {
       // userData.password = this.hashPassword(userData.password);
     }
 
+    const userId = this.authService.getCurrentUser()?.id;
+    const previousState = { ...this.initialFormValues };
+
+    // Ne pas logger le mot de passe pour des raisons de sécurité
+    const sanitizedPreviousState = { ...previousState };
+    delete sanitizedPreviousState.password;
+    delete sanitizedPreviousState.confirmPassword;
+
     const operation = this.isEditing
-      ? this.dataService.updateUser(this.authService.getCurrentUser()?.id, userData)
+      ? this.dataService.updateUser(userId!, userData)
       : this.dataService.saveUser(userData);
 
     operation.subscribe(
-      response => {
+      (response: User) => {
+        // Ne pas logger le mot de passe pour des raisons de sécurité
+        const sanitizedNewState = { ...response };
+        delete (sanitizedNewState as any).password;
+
+        this.logOperation(
+          OperationType.UPDATE,
+          response.id!,
+          `Mise à jour du profil utilisateur ${response.username}`,
+          sanitizedPreviousState,
+          sanitizedNewState
+        );
+
         this.snackBar.open('Modifications enregistrées avec succès', 'Fermer', {
           duration: 3000
         });
         this.initialFormValues = this.userForm.value;
+
+        // Mettre à jour les informations de l'utilisateur dans le service d'authentification
+        if (this.isEditing) {
+          this.dataService.updateUser(response.id,response);
+        }
       },
       error => {
         console.error('Erreur', error);

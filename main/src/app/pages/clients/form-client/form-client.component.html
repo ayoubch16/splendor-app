@@ -30,8 +30,11 @@
         <div class="col-lg-6">
           <mat-label class="f-w-600 m-b-8 d-block">Ville*</mat-label>
           <mat-form-field appearance="outline" class="w-100">
-            <input type="text" matInput placeholder="Ville" formControlName="ville_id" [matAutocomplete]="autoVille">
-            <mat-autocomplete #autoVille="matAutocomplete" [displayWith]="displayVille" (optionSelected)="onVilleSelected($event)">
+            <input type="text" matInput placeholder="Ville" formControlName="ville_id"
+                   [matAutocomplete]="autoVille">
+            <mat-autocomplete #autoVille="matAutocomplete"
+                              [displayWith]="displayVille"
+                              (optionSelected)="onVilleSelected($event)">
               <mat-option *ngFor="let ville of filteredVilles | async" [value]="ville">
                 {{ ville.nom }} ({{ ville.codePostal }})
               </mat-option>
@@ -174,7 +177,7 @@
           <button mat-icon-button color="primary" (click)="editClient(client)" matTooltip="Modifier">
             <mat-icon>edit</mat-icon>
           </button>
-          <button mat-icon-button color="warn" (click)="deleteClient(client.id)" matTooltip="Supprimer">
+          <button mat-icon-button color="warn" (click)="deleteClient(client)" matTooltip="Supprimer">
             <mat-icon>delete</mat-icon>
           </button>
         </td>
@@ -183,10 +186,11 @@
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
-    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]"
-                   showFirstLastButtons
-                   [length]="dataSource.filteredData.length"
-                   [pageSize]="5">
+    <mat-paginator
+      [pageSize]="5"
+      [pageSizeOptions]="[5, 10, 20]"
+      showFirstLastButtons>
     </mat-paginator>
+
   </mat-card-content>
 </mat-card>

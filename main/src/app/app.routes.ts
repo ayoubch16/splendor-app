@@ -50,6 +50,11 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./pages/profil/profil.routes').then((m) => m.ProfilRoutes),
       },
+      {
+        path: 'traceability',
+        loadChildren: () =>
+          import('./pages/traceability/traceability.routes').then((m) => m.TraceabilityRoutes),
+      }
     ],
   },
   {

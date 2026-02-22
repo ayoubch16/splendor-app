@@ -35,6 +35,11 @@ export const navItems: NavItem[] = [
     route: '/articles',
   },
   {
+    displayName: 'Historiques',
+    iconName: 'solar:history-line-duotone',
+    route: '/traceability',
+  },
+  {
     displayName: 'Mon Profil',
     iconName: 'hugeicons:user',
     route: '/profil',

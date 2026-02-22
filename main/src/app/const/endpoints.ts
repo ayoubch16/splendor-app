@@ -43,6 +43,7 @@ export const endpoints = {
     delete: (id: number) => `/api/devis/${id}`,
     getOne: (id: number) => `/api/devis/${id}`,
     list: `/api/devis`,
+    listLast: `/api/last-devis`,
     updateStatut: (id: number,statut:string) => `/api/devis/${id}/${statut}`,
     getByClient: (clientId: number) => `/api/devis/client/${clientId}`,
     getArticles: (id: number) => `/api/devis/${id}/articles`,
@@ -56,6 +57,7 @@ export const endpoints = {
     delete: (id: number) => `/api/factures/${id}`,
     getOne: (id: number) => `/api/factures/${id}`,
     list: `/api/factures`,
+    listLast: `/api/last-factures`,
     updateStatut: (id: number,statut:string) => `/api/factures/${id}/${statut}`,
     getByClient: (clientId: number) => `/api/factures/client/${clientId}`,
     getArticles: (id: number) => `/api/factures/${id}/articles`,
@@ -67,6 +69,7 @@ export const endpoints = {
     delete: (id: number) => `/api/bls/${id}`,
     getOne: (id: number) => `/api/bls/${id}`,
     list: `/api/bls`,
+    listLast: `/api/last-bls`,
     updateStatut: (id: number,statut:string)  => `/api/bls/${id}/${statut}`,
     getByClient: (clientId: number) => `/api/bls/client/${clientId}`,
     getArticles: (id: number) => `/api/bls/${id}/articles`,
@@ -74,5 +77,10 @@ export const endpoints = {
   },
   file: {
     genererPDF :  '/api/download-pdf'
+  },
+  traceability : {
+    getAllOperations: `/api/traceability`,
+    getOperationsByEntity: (id: number) => `/api/traceability/${id}`,
+    logOperation: `/api/traceability`,
   }
 };

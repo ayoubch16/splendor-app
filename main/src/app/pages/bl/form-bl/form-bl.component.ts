@@ -14,16 +14,18 @@ import {MatDialog} from '@angular/material/dialog';
 import {BehaviorSubject, Observable} from "rxjs";
 import {finalize} from 'rxjs/operators';
 
-import {Article, ArticleTable, Bl, Client, StatutBL, TypeDocument} from "../../../interfaces/entites";
+import {Article, ArticleTable, Bl, Client, EntityType, OperationType, StatutBL, TypeDocument} from "../../../interfaces/entites";
 import {DataService} from "../../../services/data.service";
-import {FormArticleComponent} from "../../articles/form-article/form-article.component";
 import {MatSpinner} from "@angular/material/progress-spinner";
 import {DownloadBlComponent} from "../download-bl/download-bl.component";
 import {DownloadBlPrintComponent} from "../download-bl-print/download-bl-print.component";
 import {ChangeStatusComponent} from "../../../components/change-status/change-status.component";
 import {PdfService} from "../../../services/pdf.service";
 import {PdfViewerModalComponent} from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
-import {MatPaginator} from "@angular/material/paginator";
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import {AuthService} from "../../../services/auth.service";
+import {TraceabilityService} from "../../../services/traceability.service";
+import {ConfirmationModalComponent} from "../../../components/confirmation-modal/confirmation-modal.component";
 
 @Component({
   selector: 'app-form-bl',
@@ -45,6 +47,7 @@ import {MatPaginator} from "@angular/material/paginator";
     DownloadBlComponent,
     DownloadBlPrintComponent,
     MatPaginator,
+    MatPaginatorModule,
   ],
   templateUrl: './form-bl.component.html'
 })
@@ -79,6 +82,7 @@ export class FormBlComponent implements OnInit, AfterViewInit {
   selectedClientId: number | null = null;
   blDate: string = new Date().toISOString().split('T')[0];
   blNumber = '';
+  bcNumber = '';
   currentBlId: number | null = null;
   isEditMode = false;
 
@@ -89,7 +93,9 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     private dataService: DataService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-    private pdfService: PdfService
+    private pdfService: PdfService,
+    private authService: AuthService,
+    private traceabilityService: TraceabilityService
   ) { }
 
   ngOnInit(): void {
@@ -102,15 +108,31 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     this.loadBls();
   }
 
-  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
-    this._paginator = value;
-    if (this._paginator) {
-      this.dataSource.paginator = this._paginator;
-    }
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+
+  ngAfterViewInit(): void {
+    this.dataSource.paginator = this.paginator;
   }
 
-  ngAfterViewInit() {
-    this.dataSource.paginator = this.paginator;
+  private logOperation(
+    operationType: OperationType,
+    entityId: number,
+    details: string,
+    previousState?: any,
+    newState?: any
+  ): void {
+    const user = this.authService.getCurrentUser()!;
+
+    this.traceabilityService.logOperation({
+      operationType,
+      entityType: EntityType.BON_LIVRAISON,
+      entityId,
+      userId: user?.id || 0,
+      userName: user?.first_name + ' ' + user?.last_name || 'Unknown',
+      details,
+      previousState,
+      newState
+    });
   }
 
   // Méthodes de chargement des données
@@ -151,41 +173,21 @@ export class FormBlComponent implements OnInit, AfterViewInit {
   appliquerFiltres(): void {
     if (!this.listeBls) return;
 
-    // Convertir les dates une seule fois
     const dateDebut = this.filtreDateDebut ? new Date(this.filtreDateDebut) : null;
     const dateFin = this.filtreDateFin ? new Date(this.filtreDateFin) : null;
 
-    // Normaliser les chaînes de recherche
     const searchNumero = this.filtreNumero?.toLowerCase() || '';
     const searchClient = this.filtreClient?.toLowerCase() || '';
 
     this.dataSource.data = this.listeBls.filter(bl => {
-      // Filtre par numéro
-      if (searchNumero && !bl.numBl?.toLowerCase().includes(searchNumero)) {
-        return false;
-      }
+      if (searchNumero && !bl.numBl?.toLowerCase().includes(searchNumero)) return false;
+      if (searchClient && !bl.client?.raisonSociale?.toLowerCase().includes(searchClient)) return false;
+      if (this.filtreStatut && bl.statut !== this.filtreStatut) return false;
 
-      // Filtre par client
-      if (searchClient && !bl.client?.raisonSociale?.toLowerCase().includes(searchClient)) {
-        return false;
-      }
-
-      // Filtre par statut
-      if (this.filtreStatut && bl.statut !== this.filtreStatut) {
-        return false;
-      }
-
-      // Filtre par date
       if (dateDebut || dateFin) {
         const dateBl = new Date(bl.date);
-
-        if (dateDebut && dateBl < dateDebut) {
-          return false;
-        }
-
-        if (dateFin && dateBl > dateFin) {
-          return false;
-        }
+        if (dateDebut && dateBl < dateDebut) return false;
+        if (dateFin && dateBl > dateFin) return false;
       }
 
       return true;
@@ -194,7 +196,11 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
     }
+
+    // ✅ OBLIGATOIRE
+    this.dataSource._updateChangeSubscription();
   }
+
 
   reinitialiserFiltres(): void {
     this.filtreNumero = '';
@@ -263,7 +269,7 @@ export class FormBlComponent implements OnInit, AfterViewInit {
   }
 
   // Méthodes pour la gestion des BLs
-  enregistrerBl(): void {
+  async enregistrerBl(): Promise<void> {
     if (!this.selectedClientId || this.articles.length === 0) {
       this.showErrorMessage('Veuillez sélectionner un client et ajouter au moins un article');
       return;
@@ -272,10 +278,20 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     const client = this.clients.find(c => c.id === this.selectedClientId);
     if (!client) return;
 
+    const confirmed = await this.openConfirmationDialog(
+      this.isEditMode ? 'Modifier BL' : 'Créer BL',
+      this.isEditMode
+        ? `Voulez-vous modifier le BL ${this.blNumber} ?`
+        : `Voulez-vous créer un nouveau BL pour ${client.raisonSociale} ?`
+    );
+
+    if (!confirmed) return;
+
     this.isLoading = true;
     const bl: Bl = {
       id: this.currentBlId || 0,
       numBl: this.blNumber,
+      numBC: this.bcNumber,
       client: client,
       statut: StatutBL.NON_LIVRE,
       date: this.blDate,
@@ -288,12 +304,26 @@ export class FormBlComponent implements OnInit, AfterViewInit {
       }))
     };
 
-    this.dataService.updateBl(this.currentBlId!, bl).pipe(
+    const operation$ = this.isEditMode
+      ? this.dataService.updateBl(this.currentBlId!, bl)
+      : this.dataService.createBl(bl.id);
+
+    operation$.pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
-      next: () => {
-        this.showSuccessMessage('BL modifié avec succès');
+      next: (savedBl) => {
+        const operationType = this.isEditMode ? OperationType.UPDATE : OperationType.CREATE;
+        this.logOperation(
+          operationType,
+          savedBl.id!,
+          `${operationType} BL ${savedBl.numBl}`,
+          this.isEditMode ? bl : null,
+          savedBl
+        );
+
+        this.showSuccessMessage(`BL ${this.isEditMode ? 'modifié' : 'créé'} avec succès`);
         this.loadBls();
+        this.resetForm();
       },
       error: (error) => {
         this.showErrorMessage(`Erreur: ${error.message}`);
@@ -301,13 +331,21 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     });
   }
 
-  editBl(bl: Bl): void {
+  async editBl(bl: Bl): Promise<void> {
+    const confirmed = await this.openConfirmationDialog(
+      'Modifier BL',
+      `Voulez-vous modifier le BL ${bl.numBl} ?`
+    );
+
+    if (!confirmed) return;
+
     this.isEditMode = true;
     this.currentBlId = bl.id;
     this.selectedClientId = bl.client.id;
     this.clientName = bl.client.raisonSociale;
     this.blDate = bl.date;
     this.blNumber = bl.numBl;
+    this.bcNumber = bl.numBC!;
 
     const articles: ArticleTable[] = bl.articles.map(article => ({
       designation: article.designation,
@@ -321,24 +359,37 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     this.scrollToForm();
   }
 
-  deleteBl(bl: Bl): void {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce BL ?')) {
-      this.isLoading = true;
-      this.dataService.deleteBl(bl.id).pipe(
-        finalize(() => this.isLoading = false)
-      ).subscribe({
-        next: () => {
-          this.showSuccessMessage('BL supprimé avec succès');
-          this.loadBls();
-          if (this.currentBlId === bl.id) {
-            this.resetForm();
-          }
-        },
-        error: (error) => {
-          this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
+  async deleteBl(bl: Bl): Promise<void> {
+    const confirmed = await this.openConfirmationDialog(
+      'Supprimer BL',
+      `Voulez-vous supprimer définitivement le BL ${bl.numBl} pour ${bl.client.raisonSociale} ?`
+    );
+
+    if (!confirmed) return;
+
+    this.isLoading = true;
+    this.dataService.deleteBl(bl.id).pipe(
+      finalize(() => this.isLoading = false)
+    ).subscribe({
+      next: () => {
+        this.logOperation(
+          OperationType.DELETE,
+          bl.id!,
+          `Suppression BL ${bl.numBl}`,
+          bl,
+          null
+        );
+
+        this.showSuccessMessage('BL supprimé avec succès');
+        this.loadBls();
+        if (this.currentBlId === bl.id) {
+          this.resetForm();
         }
-      });
-    }
+      },
+      error: (error) => {
+        this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
+      }
+    });
   }
 
   resetForm(): void {
@@ -355,6 +406,7 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     this.isLoading = true;
     this.pdfService.generatePdf(bl, { type: TypeDocument.BL, withSignature: false })
       .then(blob => {
+
         this.dialog.open(PdfViewerModalComponent, {
           width: '90%',
           maxWidth: '1000px',
@@ -373,19 +425,34 @@ export class FormBlComponent implements OnInit, AfterViewInit {
       });
   }
 
-  changerStatut(bl: Bl): void {
+  async changerStatut(bl: Bl): Promise<void> {
     const dialogRef = this.dialog.open(ChangeStatusComponent, {
       width: '400px',
       data: { currentStatus: bl.statut, blId: bl.id!, documentType: TypeDocument.BL }
     });
 
-    dialogRef.afterClosed().subscribe(newStatus => {
+    dialogRef.afterClosed().subscribe(async (newStatus) => {
       if (newStatus) {
+        const confirmed = await this.openConfirmationDialog(
+          'Changer statut',
+          `Voulez-vous changer le statut de "${bl.statut}" à "${newStatus}" ?`
+        );
+
+        if (!confirmed) return;
+
         this.isLoading = true;
         this.dataService.updateBlStatut(bl.id!, newStatus)
           .pipe(finalize(() => this.isLoading = false))
           .subscribe({
             next: () => {
+              this.logOperation(
+                OperationType.STATUS_CHANGE,
+                bl.id!,
+                `Changement statut de ${bl.statut} à ${newStatus}`,
+                { statut: bl.statut },
+                { statut: newStatus }
+              );
+
               this.showSuccessMessage('Statut mis à jour avec succès');
               this.loadBls();
             },
@@ -417,6 +484,14 @@ export class FormBlComponent implements OnInit, AfterViewInit {
       duration: 5000,
       panelClass: ['error-snackbar']
     });
+  }
+
+  private openConfirmationDialog(title: string, message: string): Promise<boolean> {
+    const dialogRef = this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: { title, message }
+    });
+    return dialogRef.afterClosed().toPromise();
   }
 
   formatNumberForDisplay(value: any): number {

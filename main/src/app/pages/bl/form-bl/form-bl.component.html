@@ -26,6 +26,15 @@
         </div>
       </div>
 
+      <div class="row" style="justify-content: end">
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Numéro BL</mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="bcNumber" name="bcNumber"  />
+          </mat-form-field>
+        </div>
+      </div>
+
       <div class="article-table-container m-t-20 m-b-20">
         <h3 class="m-b-16">Liste des articles</h3>
 
@@ -244,7 +253,11 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
       </table>
-      <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+      <mat-paginator
+        [pageSize]="5"
+        [pageSizeOptions]="[5, 10, 20]"
+        showFirstLastButtons>
+      </mat-paginator>
     </div>
   </mat-card-content>
 </mat-card>

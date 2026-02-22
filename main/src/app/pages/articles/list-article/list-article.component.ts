@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from "@angular/forms";
-import { Article } from "../../../interfaces/entites";
+import {Article, EntityType, OperationType} from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
@@ -15,10 +15,13 @@ import { EventBusService } from "../../../services/event-bus.service";
 import { Event } from "../../../interfaces/EmitEvent";
 import { ConfirmationModalComponent } from "../../../components/confirmation-modal/confirmation-modal.component";
 import { MatDialog } from "@angular/material/dialog";
-import { MatPaginator } from "@angular/material/paginator";
+import { MatPaginator, MatPaginatorModule } from "@angular/material/paginator";
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import {debounceTime, distinctUntilChanged, takeUntil} from 'rxjs/operators';
 import {MatProgressSpinner} from "@angular/material/progress-spinner";
+import {Subject} from "rxjs";
+import {AuthService} from "../../../services/auth.service";
+import {TraceabilityService} from "../../../services/traceability.service";
 
 @Component({
   selector: 'app-list-article',
@@ -35,7 +38,8 @@ import {MatProgressSpinner} from "@angular/material/progress-spinner";
     MatTooltipModule,
     MatPaginator,
     MatSnackBarModule,
-    MatProgressSpinner
+    MatProgressSpinner,
+    MatPaginatorModule,
   ],
   templateUrl: './list-article.component.html',
   standalone: true
@@ -47,22 +51,18 @@ export class ListArticleComponent implements OnInit, AfterViewInit {
   dataSource: MatTableDataSource<Article> = new MatTableDataSource<Article>();
   filterForm: FormGroup;
   isLoading = false;
+  private destroy$ = new Subject<void>();
 
-  private _paginator!: MatPaginator;
-
-  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
-    this._paginator = value;
-    if (this._paginator) {
-      this.dataSource.paginator = this._paginator;
-    }
-  }
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   constructor(
     private dataService: DataService,
     private eventBusService: EventBusService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private authService: AuthService,
+    private traceabilityService: TraceabilityService,
   ) {
     this.filterForm = this.fb.group({
       search: [''],
@@ -76,9 +76,15 @@ export class ListArticleComponent implements OnInit, AfterViewInit {
     this.initFilters();
     this.loadCategories();
     this.loadArticles();
+
+    this.eventBusService.onObserver<Article>([Event.AJOUTER_ARTICLE])
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.loadArticles();
+      });
   }
 
-  ngAfterViewInit() {
+  ngAfterViewInit(): void {
     this.dataSource.paginator = this.paginator;
   }
 
@@ -152,7 +158,11 @@ export class ListArticleComponent implements OnInit, AfterViewInit {
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
     }
+
+    // ✅ OBLIGATOIRE
+    this.dataSource._updateChangeSubscription();
   }
+
 
   resetFilters(): void {
     this.filterForm.reset({
@@ -183,6 +193,13 @@ export class ListArticleComponent implements OnInit, AfterViewInit {
         this.isLoading = true;
         this.dataService.deleteArticle(articleId).subscribe({
           next: () => {
+            this.logOperation(
+              OperationType.DELETE,
+              articleId!,
+              `Suppression de l'article "${articleId}"`,
+              null,
+              null
+            );
             this.showSuccessMessage('Article supprimé avec succès');
             this.eventBusService.emit<Article>(Event.AJOUTER_ARTICLE);
             this.loadArticles();
@@ -208,5 +225,31 @@ export class ListArticleComponent implements OnInit, AfterViewInit {
       duration: 5000,
       panelClass: ['error-snackbar']
     });
+  }
+
+  private logOperation(
+    operationType: OperationType,
+    entityId: number,
+    details: string,
+    previousState?: any,
+    newState?: any
+  ): void {
+    const user = this.authService.getCurrentUser()!;
+
+    this.traceabilityService.logOperation({
+      operationType,
+      entityType: EntityType.ARTICLE,
+      entityId,
+      userId: user?.id || 0,
+      userName: user?.first_name + ' ' + user?.last_name || 'Unknown',
+      details,
+      previousState,
+      newState
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 }

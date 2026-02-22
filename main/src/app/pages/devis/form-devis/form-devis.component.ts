@@ -10,7 +10,7 @@ import {
   Article,
   ArticleTable,
   Client,
-  Devis, EmailPayload,
+  Devis, EmailPayload, EntityType, OperationType,
   StatutDevis,
   TypeDocument
 } from "../../../interfaces/entites";
@@ -38,6 +38,8 @@ import {DownloadDevisComponent} from "../download-devis/download-devis.component
 import {DownloadDevisPrintComponent} from "../download-devis-print/download-devis-print.component";
 import {EmailService} from "../../../services/email.service";
 import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
+import {TraceabilityService} from "../../../services/traceability.service";
+import {AuthService} from "../../../services/auth.service";
 
 @Component({
   selector: 'app-form-devis',
@@ -116,11 +118,34 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
     private eventBusService: EventBusService,
     private pdfService: PdfService,
     private pdfV2Service: PdfV2Service,
-    private emailService: EmailService
+    private emailService: EmailService,
+    private traceabilityService: TraceabilityService,
+    private authService: AuthService
   ) { }
 
   get articles(): ArticleTable[] {
     return this.articlesSubject.value;
+  }
+
+  private logOperation(
+    operationType: OperationType,
+    entityId: number,
+    details: string,
+    previousState?: any,
+    newState?: any
+  ): void {
+    const user = this.authService.getCurrentUser()!;
+
+    this.traceabilityService.logOperation({
+      operationType,
+      entityType: EntityType.DEVIS,
+      entityId,
+      userId: user?.id || 0,
+      userName: user?.first_name + ' ' + user?.last_name || 'Unknown',
+      details,
+      previousState,
+      newState
+    });
   }
 
   ngOnInit(): void {
@@ -436,7 +461,6 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
       }))
     };
 
-    console.log("devis : ",devis)
     const operation$ = this.currentDevisId
       ? this.dataService.updateDevis(this.currentDevisId, devis)
       : this.dataService.createDevis(devis);
@@ -444,7 +468,15 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
     operation$.pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
-      next: () => {
+      next: (savedDevis) => {
+        const operationType = this.currentDevisId ? OperationType.UPDATE : OperationType.CREATE;
+        this.logOperation(
+          operationType,
+          savedDevis.id!,
+          `${operationType} devis ${savedDevis.numDevis}`,
+          this.currentDevisId ? devis : null,
+          savedDevis
+        );
         this.showSuccessMessage(`Devis ${this.currentDevisId ? 'modifié' : 'ajouté'} avec succès`);
         this.resetForm();
         this.loadDevis();
@@ -496,6 +528,14 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
       finalize(() => this.isLoading = false)
     ).subscribe({
       next: () => {
+        this.logOperation(
+          OperationType.DELETE,
+          devis.id!,
+          `Suppression devis ${devis.numDevis}`,
+          devis,
+          null
+        );
+
         this.showSuccessMessage(`Devis ${devis.numDevis} supprimé avec succès`);
         this.loadDevis();
         if (this.currentDevisId === devis.id) {
@@ -503,7 +543,7 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
         }
       },
       error: (error) => {
-        this.showErrorMessage(`Erreur lors de la suppression: ${error.message || 'Opération échouée'}`);
+        this.showErrorMessage(`Impossible de supprimer: des documents associés existent`);
       }
     });
   }
@@ -626,6 +666,13 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
           .pipe(finalize(() => this.isLoading = false))
           .subscribe({
             next: () => {
+              this.logOperation(
+                OperationType.STATUS_CHANGE,
+                devis.id!,
+                `Changement statut de ${devis.statut} à ${newStatus}`,
+                { statut: devis.statut },
+                { statut: newStatus }
+              );
               this.showSuccessMessage('Statut mis à jour avec succès');
               this.loadDevis();
             },
@@ -779,6 +826,13 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
             .subscribe({
               next: (response) => {
                 if (response.success) {
+                  this.logOperation(
+                    OperationType.EMAIL_SENT,
+                    devis.id!,
+                    `Email envoyé à ${resultEmail.email}`,
+                    null,
+                    { email: resultEmail.email, subject: payload.subject }
+                  );
                   this.showSuccessMessage('Email envoyé avec succès');
                 } else {
                   this.showErrorMessage(`Erreur: ${response.message}`);

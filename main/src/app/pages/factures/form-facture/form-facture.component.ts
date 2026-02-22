@@ -14,9 +14,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { BehaviorSubject, Observable } from "rxjs";
 import { finalize } from 'rxjs/operators';
 
-import {Article, ArticleTable, Client, Facture, StatutFacture, TypeDocument} from "../../../interfaces/entites";
+import {Article, ArticleTable, Client, EntityType, Facture, OperationType, StatutFacture, TypeDocument} from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
-import { FormArticleComponent } from "../../articles/form-article/form-article.component";
 import {MatSpinner} from "@angular/material/progress-spinner";
 import {DomSanitizer} from "@angular/platform-browser";
 import {PdfService} from "../../../services/pdf.service";
@@ -25,7 +24,10 @@ import {DownloadFactureComponent} from "../download-facture/download-facture.com
 import {DownloadFacturePrintComponent} from "../download-facture-print/download-facture-print.component";
 import {ChangeStatusComponent} from "../../../components/change-status/change-status.component";
 import {SendEmailComponent} from "../../../components/send-email/send-email.component";
-import {MatPaginator} from "@angular/material/paginator";
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import {AuthService} from "../../../services/auth.service";
+import {TraceabilityService} from "../../../services/traceability.service";
+import {ConfirmationModalComponent} from "../../../components/confirmation-modal/confirmation-modal.component";
 
 @Component({
   selector: 'app-form-facture',
@@ -46,7 +48,8 @@ import {MatPaginator} from "@angular/material/paginator";
     MatSpinner,
     DownloadFactureComponent,
     DownloadFacturePrintComponent,
-    MatPaginator
+    MatPaginator,
+    MatPaginatorModule
   ],
   templateUrl: './form-facture.component.html',
   styleUrls: ['./form-facture.component.scss']
@@ -85,25 +88,23 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
   selectedClientId: number | null = null;
   factureDate = new Date().toISOString().split('T')[0];
   factureNumber = '';
+  bcNumber = '';
   currentFactureId: number | null = null;
   isEditMode = false;
 
   dataSource: MatTableDataSource<Facture> = new MatTableDataSource<Facture>();
   private _paginator!: MatPaginator;
 
-  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
-    this._paginator = value;
-    if (this._paginator) {
-      this.dataSource.paginator = this._paginator;
-    }
-  }
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   constructor(
     private dataService: DataService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private pdfService: PdfService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private authService: AuthService,
+    private traceabilityService: TraceabilityService
   ) { }
 
   ngOnInit(): void {
@@ -116,8 +117,29 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     this.loadFactures();
   }
 
-  ngAfterViewInit() {
+  ngAfterViewInit(): void {
     this.dataSource.paginator = this.paginator;
+  }
+
+  private logOperation(
+    operationType: OperationType,
+    entityId: number,
+    details: string,
+    previousState?: any,
+    newState?: any
+  ): void {
+    const user = this.authService.getCurrentUser()!;
+
+    this.traceabilityService.logOperation({
+      operationType,
+      entityType: EntityType.FACTURE,
+      entityId,
+      userId: user?.id || 0,
+      userName: user?.first_name + ' ' + user?.last_name || 'Unknown',
+      details,
+      previousState,
+      newState
+    });
   }
 
   // Méthodes de chargement des données
@@ -158,41 +180,21 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
   appliquerFiltres(): void {
     if (!this.listeFactures) return;
 
-    // Convertir les dates une seule fois
     const dateDebut = this.filtreDateDebut ? new Date(this.filtreDateDebut) : null;
     const dateFin = this.filtreDateFin ? new Date(this.filtreDateFin) : null;
 
-    // Normaliser les chaînes de recherche
     const searchNumero = this.filtreNumero?.toLowerCase() || '';
     const searchClient = this.filtreClient?.toLowerCase() || '';
 
     this.dataSource.data = this.listeFactures.filter(facture => {
-      // Filtre par numéro
-      if (searchNumero && !facture.numFacture?.toLowerCase().includes(searchNumero)) {
-        return false;
-      }
+      if (searchNumero && !facture.numFacture?.toLowerCase().includes(searchNumero)) return false;
+      if (searchClient && !facture.client?.raisonSociale?.toLowerCase().includes(searchClient)) return false;
+      if (this.filtreStatut && facture.statut !== this.filtreStatut) return false;
 
-      // Filtre par client
-      if (searchClient && !facture.client?.raisonSociale?.toLowerCase().includes(searchClient)) {
-        return false;
-      }
-
-      // Filtre par statut
-      if (this.filtreStatut && facture.statut !== this.filtreStatut) {
-        return false;
-      }
-
-      // Filtre par date
       if (dateDebut || dateFin) {
         const dateFacture = new Date(facture.date);
-
-        if (dateDebut && dateFacture < dateDebut) {
-          return false;
-        }
-
-        if (dateFin && dateFacture > dateFin) {
-          return false;
-        }
+        if (dateDebut && dateFacture < dateDebut) return false;
+        if (dateFin && dateFacture > dateFin) return false;
       }
 
       return true;
@@ -201,7 +203,10 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
     }
+
+    this.dataSource._updateChangeSubscription();
   }
+
 
   reinitialiserFiltres(): void {
     this.filtreNumero = '';
@@ -273,7 +278,7 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
   }
 
   // Méthodes pour la gestion des factures
-  enregistrerFacture(): void {
+  async enregistrerFacture(): Promise<void> {
     if (!this.selectedClientId || this.articles.length === 0) {
       this.showErrorMessage('Veuillez sélectionner un client et ajouter au moins un article');
       return;
@@ -282,10 +287,20 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     const client = this.clients.find(c => c.id === this.selectedClientId);
     if (!client) return;
 
+    const confirmed = await this.openConfirmationDialog(
+      this.isEditMode ? 'Modifier facture' : 'Créer facture',
+      this.isEditMode
+        ? `Voulez-vous modifier la facture ${this.factureNumber} ?`
+        : `Voulez-vous créer une nouvelle facture pour ${client.raisonSociale} ?`
+    );
+
+    if (!confirmed) return;
+
     this.isLoading = true;
     const facture: Facture = {
-      id: this.currentFactureId!,
+      id: this.currentFactureId || undefined,
       numFacture: this.factureNumber,
+      numBC : this.bcNumber,
       client: client,
       montant: Number(this.totalTTC).toFixed(2),
       statut: StatutFacture.NON_PAYEE,
@@ -299,12 +314,26 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
       }))
     };
 
-    this.dataService.updateFacture(this.currentFactureId!, facture).pipe(
+    const operation$ = this.isEditMode
+      ? this.dataService.updateFacture(this.currentFactureId!, facture)
+      : this.dataService.createFacture(facture.id!);
+
+    operation$.pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
-      next: () => {
-        this.showSuccessMessage('Facture modifiée avec succès');
+      next: (savedFacture) => {
+        const operationType = this.isEditMode ? OperationType.UPDATE : OperationType.CREATE;
+        this.logOperation(
+          operationType,
+          savedFacture.id!,
+          `${operationType} facture ${savedFacture.numFacture}`,
+          this.isEditMode ? facture : null,
+          savedFacture
+        );
+
+        this.showSuccessMessage(`Facture ${this.isEditMode ? 'modifiée' : 'créée'} avec succès`);
         this.loadFactures();
+        this.resetForm();
       },
       error: (error) => {
         this.showErrorMessage(`Erreur: ${error.message}`);
@@ -312,13 +341,21 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     });
   }
 
-  editFacture(facture: Facture): void {
+  async editFacture(facture: Facture): Promise<void> {
+    const confirmed = await this.openConfirmationDialog(
+      'Modifier facture',
+      `Voulez-vous modifier la facture ${facture.numFacture} ?`
+    );
+
+    if (!confirmed) return;
+
     this.isEditMode = true;
     this.currentFactureId = facture.id!;
     this.clientName = facture.client.raisonSociale;
     this.selectedClientId = facture.client.id;
     this.factureDate = facture.date;
     this.factureNumber = facture.numFacture!;
+    this.bcNumber=facture.numBC!;
 
     const articles: ArticleTable[] = facture.articles.map(article => ({
       designation: article.designation,
@@ -332,30 +369,44 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     this.scrollToForm();
   }
 
-  deleteFacture(facture: Facture): void {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
-      this.isLoading = true;
-      this.dataService.deleteFacture(facture.id!).pipe(
-        finalize(() => this.isLoading = false)
-      ).subscribe({
-        next: () => {
-          this.showSuccessMessage('Facture supprimée avec succès');
-          this.loadFactures();
-          if (this.currentFactureId === facture.id) {
-            this.resetForm();
-          }
-        },
-        error: (error) => {
-          this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
+  async deleteFacture(facture: Facture): Promise<void> {
+    const confirmed = await this.openConfirmationDialog(
+      'Supprimer facture',
+      `Voulez-vous supprimer définitivement la facture ${facture.numFacture} pour ${facture.client.raisonSociale} ?`
+    );
+
+    if (!confirmed) return;
+
+    this.isLoading = true;
+    this.dataService.deleteFacture(facture.id!).pipe(
+      finalize(() => this.isLoading = false)
+    ).subscribe({
+      next: () => {
+        this.logOperation(
+          OperationType.DELETE,
+          facture.id!,
+          `Suppression facture ${facture.numFacture}`,
+          facture,
+          null
+        );
+
+        this.showSuccessMessage('Facture supprimée avec succès');
+        this.loadFactures();
+        if (this.currentFactureId === facture.id) {
+          this.resetForm();
         }
-      });
-    }
+      },
+      error: (error) => {
+        this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
+      }
+    });
   }
 
   resetForm(): void {
     this.selectedClientId = null;
     this.factureDate = new Date().toISOString().split('T')[0];
     this.factureNumber = '';
+    this.bcNumber = '';
     this.articlesSubject.next([]);
     this.currentFactureId = null;
     this.isEditMode = false;
@@ -370,6 +421,7 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     this.isLoading = true;
     this.pdfService.generatePdf(facture, { type: TypeDocument.FACTURE, withSignature: false })
       .then(blob => {
+
         this.dialog.open(PdfViewerModalComponent, {
           width: '90%',
           maxWidth: '1000px',
@@ -388,7 +440,7 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
       });
   }
 
-  changerStatut(facture: Facture): void {
+  async changerStatut(facture: Facture): Promise<void> {
     const dialogRef = this.dialog.open(ChangeStatusComponent, {
       data: {
         currentStatus: facture.statut,
@@ -397,13 +449,28 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe(newStatus => {
+    dialogRef.afterClosed().subscribe(async (newStatus) => {
       if (newStatus) {
+        const confirmed = await this.openConfirmationDialog(
+          'Changer statut',
+          `Voulez-vous changer le statut de "${facture.statut}" à "${newStatus}" ?`
+        );
+
+        if (!confirmed) return;
+
         this.isLoading = true;
         this.dataService.updateFactureStatut(facture.id!, newStatus)
           .pipe(finalize(() => this.isLoading = false))
           .subscribe({
             next: () => {
+              this.logOperation(
+                OperationType.STATUS_CHANGE,
+                facture.id!,
+                `Changement statut de ${facture.statut} à ${newStatus}`,
+                { statut: facture.statut },
+                { statut: newStatus }
+              );
+
               this.showSuccessMessage('Statut mis à jour avec succès');
               this.loadFactures();
             },
@@ -415,7 +482,7 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     });
   }
 
-  envoyerParMail(facture: Facture): void {
+  async envoyerParMail(facture: Facture): Promise<void> {
     const dialogRef = this.dialog.open(SendEmailComponent, {
       width: '600px',
       data: {
@@ -426,8 +493,15 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe(resultEmail => {
+    dialogRef.afterClosed().subscribe(async (resultEmail) => {
       if (resultEmail) {
+        const confirmed = await this.openConfirmationDialog(
+          'Envoyer par email',
+          `Voulez-vous envoyer la facture ${facture.numFacture} à ${resultEmail.email} ?`
+        );
+
+        if (!confirmed) return;
+
         this.isLoading = true;
         this.pdfService.generatePdf(facture, { type: TypeDocument.FACTURE, withSignature: true })
           .then(pdfBlob => {
@@ -443,6 +517,14 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
             ).pipe(finalize(() => this.isLoading = false))
               .subscribe({
                 next: () => {
+                  this.logOperation(
+                    OperationType.EMAIL_SENT,
+                    facture.id!,
+                    `Email envoyé à ${resultEmail.email}`,
+                    null,
+                    { email: resultEmail.email, subject: resultEmail.subject }
+                  );
+
                   this.showSuccessMessage('Email envoyé avec succès');
                 },
                 error: (error) => {
@@ -479,6 +561,14 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
       duration: 5000,
       panelClass: ['error-snackbar']
     });
+  }
+
+  private openConfirmationDialog(title: string, message: string): Promise<boolean> {
+    const dialogRef = this.dialog.open(ConfirmationModalComponent, {
+      width: '400px',
+      data: { title, message }
+    });
+    return dialogRef.afterClosed().toPromise();
   }
 
   formatNumberForDisplay(value: any): number {

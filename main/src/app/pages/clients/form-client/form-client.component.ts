@@ -12,15 +12,17 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import {Client} from "../../../interfaces/entites";
+import {Client, EntityType, OperationType, Ville} from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
 import { map, Observable, startWith } from "rxjs";
 import { finalize } from 'rxjs/operators';
 import { EventBusService } from "../../../services/event-bus.service";
 import { Event } from "../../../interfaces/EmitEvent";
 import { ConfirmationModalComponent } from "../../../components/confirmation-modal/confirmation-modal.component";
-import {MatPaginator} from "@angular/material/paginator";
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import {MatProgressSpinner} from "@angular/material/progress-spinner";
+import {AuthService} from "../../../services/auth.service";
+import {TraceabilityService} from "../../../services/traceability.service";
 
 @Component({
   selector: 'app-form-client',
@@ -41,12 +43,12 @@ import {MatProgressSpinner} from "@angular/material/progress-spinner";
     MatDialogModule,
     MatPaginator,
     FormsModule,
-    MatProgressSpinner
+    MatProgressSpinner,
+    MatPaginatorModule,
   ],
   templateUrl: './form-client.component.html',
 })
 export class FormClientComponent implements OnInit, AfterViewInit {
-  @ViewChild(MatPaginator) matPaginator!: MatPaginator;
   clientForm: FormGroup;
   clients: Client[] = [];
   isEditMode = false;
@@ -54,14 +56,14 @@ export class FormClientComponent implements OnInit, AfterViewInit {
   isLoading = false;
   displayedColumns: string[] = ['raisonSociale', 'adresse', 'ice', 'telephone', 'email', 'actions'];
 
-  // Propriétés pour les filtres
+  // Filtres
   filtreRaisonSociale: string = '';
   filtreTelephone: string = '';
   filtreEmail: string = '';
   filtreIce: string = '';
 
-  villes: any[] = [];
-  filteredVilles: Observable<any[]>;
+  villes: Ville[] = [];
+  filteredVilles: Observable<Ville[]>;
 
   dataSource: MatTableDataSource<Client> = new MatTableDataSource<Client>();
   private _paginator!: MatPaginator;
@@ -70,7 +72,9 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     private fb: FormBuilder,
     private dataService: DataService,
     private eventBusService: EventBusService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private authService: AuthService,
+    private traceabilityService: TraceabilityService
   ) {
     this.clientForm = this.fb.group({
       raisonSociale: ['', Validators.required],
@@ -93,15 +97,31 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     this.setupEventListeners();
   }
 
-  @ViewChild(MatPaginator) set paginator(value: MatPaginator) {
-    this._paginator = value;
-    if (this._paginator) {
-      this.dataSource.paginator = this._paginator;
-    }
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+
+  ngAfterViewInit(): void {
+    this.dataSource.paginator = this.paginator;
   }
 
-  ngAfterViewInit() {
-    this.dataSource.paginator = this.paginator;
+  private logOperation(
+    operationType: OperationType,
+    entityId: number,
+    details: string,
+    previousState?: any,
+    newState?: any
+  ): void {
+    const user = this.authService.getCurrentUser()!;
+
+    this.traceabilityService.logOperation({
+      operationType,
+      entityType: EntityType.CLIENT,
+      entityId,
+      userId: user?.id || 0,
+      userName: user?.first_name + ' ' + user?.last_name || 'Unknown',
+      details,
+      previousState,
+      newState
+    });
   }
 
   private setupEventListeners(): void {
@@ -116,7 +136,7 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     });
   }
 
-  private _filterVilles(value: string | any): any[] {
+  private _filterVilles(value: string | Ville): Ville[] {
     if (!value) return this.villes;
 
     const filterValue = typeof value === 'string'
@@ -129,7 +149,7 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     );
   }
 
-  displayVille(ville: any): string {
+  displayVille(ville: Ville): string {
     return ville && ville.nom ? `${ville.nom} (${ville.codePostal})` : '';
   }
 
@@ -140,8 +160,7 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     ).subscribe({
       next: (clientList) => {
         this.clients = clientList;
-        this.dataSource = new MatTableDataSource<Client>(this.clients);
-        this.dataSource.paginator = this.paginator; // Réassigner le paginator après le chargement
+        this.dataSource.data = this.clients; // ✅
         this.appliquerFiltres();
       },
       error: (error) => {
@@ -150,7 +169,7 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     });
   }
 
-  // Méthodes pour les filtres
+
   appliquerFiltres(): void {
     let filteredData = this.clients;
 
@@ -180,11 +199,14 @@ export class FormClientComponent implements OnInit, AfterViewInit {
 
     this.dataSource.data = filteredData;
 
-    // Réinitialiser la pagination après filtrage
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
     }
+
+    // ✅ OBLIGATOIRE
+    this.dataSource._updateChangeSubscription();
   }
+
 
   reinitialiserFiltres(): void {
     this.filtreRaisonSociale = '';
@@ -201,7 +223,7 @@ export class FormClientComponent implements OnInit, AfterViewInit {
 
     if (selectedVille) {
       this.clientForm.patchValue({
-        ville_id: selectedVille.id
+        ville_id: selectedVille
       });
     }
   }
@@ -230,10 +252,17 @@ export class FormClientComponent implements OnInit, AfterViewInit {
 
   private saveClient(): void {
     this.isLoading = true;
+
+    const formValue = this.clientForm.value;
+    const villeObj = formValue.ville_id; // contient l'objet Ville complet
+
     const clientData: Client = {
-      ...this.clientForm.value,
-      ville: this.villes.find(v => v.id === this.clientForm.value.ville_id)
+      ...formValue,
+      ville_id: villeObj?.id ?? villeObj // ✅ on envoie seulement l'id numérique
     };
+
+    // Supprimer la propriété 'ville' pour éviter toute confusion côté backend
+    delete (clientData as any).ville;
 
     const operation$ = this.isEditMode
       ? this.dataService.updateClient(this.currentClientId!, clientData)
@@ -242,7 +271,16 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     operation$.pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
-      next: () => {
+      next: (savedClient) => {
+        const operationType = this.isEditMode ? OperationType.UPDATE : OperationType.CREATE;
+        this.logOperation(
+          operationType,
+          savedClient.id!,
+          `${operationType} client "${savedClient.raisonSociale}"`,
+          this.isEditMode ? this.clients.find(c => c.id === this.currentClientId) : null,
+          savedClient
+        );
+
         this.showSuccessMessage(`Client ${this.isEditMode ? 'modifié' : 'ajouté'} avec succès`);
         this.resetForm();
         this.eventBusService.emit(Event.AJOUTER_CLIENT);
@@ -257,19 +295,30 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     this.isEditMode = true;
     this.currentClientId = client.id;
 
-    this.clientForm.patchValue({
-      ...client,
-      ville_id: client.ville?.id
-    });
+    // Charger la ville par ID
+    const villeId = client.ville?.id || (client as any).ville_id;
+    if (villeId) {
+      this.dataService.getVilleById(villeId).subscribe(ville => {
+        this.clientForm.patchValue({
+          ...client,
+          ville_id: ville
+        });
+      });
+    } else {
+      this.clientForm.patchValue({
+        ...client
+      });
+    }
+
     this.scrollToForm();
   }
 
-  deleteClient(clientId: number): void {
+  deleteClient(client: Client): void {
     const dialogRef = this.dialog.open(ConfirmationModalComponent, {
       width: '400px',
       data: {
         title: 'Supprimer le client',
-        message: 'Êtes-vous sûr de vouloir supprimer ce client ?',
+        message: `Êtes-vous sûr de vouloir supprimer le client "${client.raisonSociale}" ?`,
         confirmText: 'Supprimer',
         cancelText: 'Annuler',
         isDelete: true
@@ -279,15 +328,24 @@ export class FormClientComponent implements OnInit, AfterViewInit {
     dialogRef.afterClosed().subscribe(confirmed => {
       if (confirmed) {
         this.isLoading = true;
-        this.dataService.deleteClient(clientId).pipe(
+        this.dataService.deleteClient(client.id!).pipe(
           finalize(() => this.isLoading = false)
         ).subscribe({
           next: () => {
+            this.logOperation(
+              OperationType.DELETE,
+              client.id!,
+              `Suppression client "${client.raisonSociale}"`,
+              client,
+              null
+            );
+
             this.showSuccessMessage('Client supprimé avec succès');
             this.eventBusService.emit(Event.AJOUTER_CLIENT);
           },
           error: (error) => {
-            this.showErrorMessage(`Erreur lors de la suppression: ${error.message}`);
+            const message = error.error?.message || 'Impossible de supprimer ce client car il possède des bons de livraison, devis ou factures associés.';
+            this.showErrorMessage(message); // ✅ affiche le message du backend
           }
         });
       }

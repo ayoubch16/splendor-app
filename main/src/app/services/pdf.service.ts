@@ -179,7 +179,12 @@ export class PdfService {
     const documentNumber = this.getDocumentNumber(document, type);
 
     doc.text(`${documentLabel}: N° ${documentNumber}`, pageWidth - margin, 10 + this.HEADER_HEIGHT, { align: 'right' });
-    doc.text(`DATE: ${new Date(document.date).toLocaleDateString('fr-FR')}`, pageWidth - margin, 17 + this.HEADER_HEIGHT, { align: 'right' });
+    if (document.numBC != null && type !== TypeDocument.DEVIS) {
+      doc.text(`Bonne de Commande: N° ${document.numBC}`, pageWidth - margin, 17 + this.HEADER_HEIGHT, { align: 'right' });
+      doc.text(`DATE: ${new Date(document.date).toLocaleDateString('fr-FR')}`, pageWidth - margin, 24 + this.HEADER_HEIGHT, { align: 'right' });
+    } else {
+      doc.text(`DATE: ${new Date(document.date).toLocaleDateString('fr-FR')}`, pageWidth - margin, 17 + this.HEADER_HEIGHT, { align: 'right' });
+    }
   }
 
   private addTotalsSection(doc: jsPDF, articles: ArticleTableFacture[], pageWidth: number, margin: number, yPosition: number): void {

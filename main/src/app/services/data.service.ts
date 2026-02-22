@@ -182,6 +182,10 @@ export class DataService {
     return this.httpService.get(endpoints.devis.list)
   }
 
+  getLastDevis(): Observable<Devis[]> {
+    return this.httpService.get(endpoints.devis.listLast)
+  }
+
   getDevisByClient(clientId: number): Observable<Devis[]> {
     return this.httpService.get(endpoints.devis.getByClient(clientId))
   }
@@ -218,6 +222,10 @@ export class DataService {
     return this.httpService.get(endpoints.facture.list)
   }
 
+  getLastFactures(): Observable<Facture[]> {
+    return this.httpService.get(endpoints.facture.listLast)
+  }
+
   updateFacture(id:number,facture: Facture): Observable<Facture> {
     return this.httpService.put(endpoints.facture.update(id),facture)
   }
@@ -227,8 +235,6 @@ export class DataService {
   }
 
   updateFactureStatut(id: number, statut: StatutFacture): Observable<Facture> {
-    console.log("id :"+id)
-    console.log("statut :"+statut)
     return this.httpService.put(endpoints.facture.updateStatut(id,statut), {})
   }
 
@@ -241,6 +247,10 @@ export class DataService {
 
   getBls(): Observable<Bl[]> {
     return this.httpService.get(endpoints.bl.list)
+  }
+
+  getLastBls(): Observable<Bl[]> {
+    return this.httpService.get(endpoints.bl.listLast)
   }
 
   updateBl(id:number,bl: Bl): Observable<Bl> {
