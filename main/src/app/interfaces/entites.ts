@@ -16,6 +16,7 @@ export interface ArticleTable {
   quantite: number;
   prixUnitaire: number;
   prixTotal: number;
+  remise?: number;
 }
 
 export interface ArticleTableBl {
@@ -26,6 +27,7 @@ export interface ArticleTableBl {
   prixUnitaire: number;
   prixTotal: number;
   bl?: Bl;
+  remise?: number;
 }
 
 export interface ArticleTableDevis {
@@ -36,6 +38,7 @@ export interface ArticleTableDevis {
   prixUnitaire: number;
   prixTotal: number;
   devis?: Devis;
+  remise?: number;
 }
 
 export interface ArticleTableFacture {
@@ -46,6 +49,7 @@ export interface ArticleTableFacture {
   prixUnitaire: number;
   prixTotal: number;
   facture?: Facture;
+  remise?: number;
 }
 
 export interface Bl {
@@ -89,6 +93,7 @@ export interface Devis {
   articles: ArticleTableDevis[];
   factureExistante?:boolean
   blExistante?:boolean
+  remiseDevis?:number
 }
 
 export interface Facture {

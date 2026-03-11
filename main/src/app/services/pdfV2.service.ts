@@ -8,8 +8,8 @@ import {MatDialog} from "@angular/material/dialog";
   providedIn: 'root'
 })
 export class PdfV2Service {
-  private apiUrl = 'http://localhost:8000/api';
-  // private apiUrl = 'https://splendorart.ma/app/api/index.php';
+  // private apiUrl = 'http://localhost:8000/api';
+  private apiUrl = 'https://splendorart.ma/app/api/index.php';
 
 
   constructor(private http: HttpClient,

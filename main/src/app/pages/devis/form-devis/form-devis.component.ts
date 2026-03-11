@@ -86,9 +86,8 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
   selectedClientId: number | null = null;
   selectedArticleId: number | null = null;
 
-  colonnesAffichees: string[] = ['#', 'designation', 'description', 'category', 'quantite', 'prixUnitaire', 'prixTotal', 'actions'];
-  displayedColumns2: string[] = ['numDevis', 'clientName', 'montant', 'statut', 'date', 'menu'];
-
+  colonnesAffichees: string[] = ['#', 'designation', 'description', 'category', 'quantite', 'prixUnitaire', 'remise', 'prixTotal', 'actions'];
+  displayedColumns2: string[] = ['numDevis', 'clientName', 'montant', 'remiseDevis', 'statut', 'date', 'menu'];
   nouvelArticle: ArticleTable = this.initialiserNouvelArticle();
   totalHT = 0;
   tva = 0;
@@ -108,6 +107,7 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
   filtreDateDebut: string = '';
   filtreDateFin: string = '';
   statutsDevis: StatutDevis[] = Object.values(StatutDevis);
+  remiseDevis: number = 0;
 
   @Output() articlesChanged = new EventEmitter<ArticleTable[]>();
 
@@ -334,12 +334,17 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
       description: '',
       quantite: 1,
       prixUnitaire: 0,
-      prixTotal: 0
+      prixTotal: 0,
+      remise: 0
     };
   }
 
+
+
   calculerTotal(): void {
-    this.nouvelArticle.prixTotal = this.nouvelArticle.quantite * this.nouvelArticle.prixUnitaire;
+    const prixBrut = this.nouvelArticle.quantite * this.nouvelArticle.prixUnitaire;
+    const remise = this.nouvelArticle.remise || 0;
+    this.nouvelArticle.prixTotal = prixBrut * (1 - remise / 100);
   }
 
   async ajouterArticle(): Promise<void> {
@@ -412,9 +417,14 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
 
   calculerTotaux(): void {
     const articles = this.articlesSubject.value;
-    this.totalHT = articles.reduce((sum, article) => sum + article.prixTotal, 0);
+    this.totalHT = articles.reduce((sum, article) => {
+      const prixTotal = typeof article.prixTotal === 'string'
+        ? parseFloat(article.prixTotal)
+        : article.prixTotal;
+      return sum + (isNaN(prixTotal) ? 0 : prixTotal);
+    }, 0);
     this.tva = this.totalHT * 0.2;
-    this.totalTTC = this.totalHT + this.tva;
+    this.totalTTC = (this.totalHT + this.tva) * (1 - (this.remiseDevis || 0) / 100);
   }
 
   async enregistrerDevis(): Promise<void> {
@@ -452,12 +462,14 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
       montant: Number(this.totalTTC).toFixed(2),
       statut: StatutDevis.EN_ATTENTE,
       date: this.devisDate,
+      remiseDevis : this.remiseDevis,
       articles: this.articles.map(article => ({
         designation: article.designation,
         description: article.description,
         quantite: article.quantite,
         prixUnitaire: article.prixUnitaire,
-        prixTotal: article.prixTotal
+        prixTotal: article.prixTotal,
+        remise: article.remise || 0
       }))
     };
 
@@ -507,9 +519,10 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
       description: article.description,
       quantite: article.quantite,
       prixUnitaire: article.prixUnitaire,
-      prixTotal: article.prixTotal
+      prixTotal: article.prixTotal,
+      remise: article.remise || 0
     }));
-
+    this.remiseDevis = devis.remiseDevis || 0;
     this.articlesSubject.next(articles);
     this.calculerTotaux();
     this.scrollToForm();
@@ -554,7 +567,6 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
         'Annuler modifications',
         'Voulez-vous annuler ? Toutes les modifications non enregistrées seront perdues.'
       );
-
       if (!confirmed) return;
     }
 
@@ -568,6 +580,10 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
     this.nouvelArticle = this.initialiserNouvelArticle();
     this.modeEdition = false;
     this.articleEnEditionIndex = -1;
+    this.remiseDevis = 0;
+    this.totalHT = 0;
+    this.tva = 0;
+    this.totalTTC = 0;
   }
 
   get canSaveDevis(): boolean {
@@ -865,5 +881,9 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
 
   private showInfoMessage(message: string): void {
     console.info('Info:', message);
+  }
+
+  onRemiseDevisChange(): void {
+    this.calculerTotaux();
   }
 }

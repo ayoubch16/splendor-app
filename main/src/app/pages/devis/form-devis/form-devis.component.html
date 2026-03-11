@@ -59,7 +59,7 @@
           <!-- Bouton nouvel article -->
           <div class="col-lg-1 d-flex">
             <button mat-stroked-button color="accent" (click)="ouvrirFormulaireArticle()" class="m-r-8">
-              <mat-icon>add</mat-icon> Nouveau
+               +
             </button>
           </div>
 
@@ -89,11 +89,20 @@
             </mat-form-field>
           </div>
 
+          <!-- Remise article -->
+          <div class="col-lg-1">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Remise (%)</mat-label>
+              <input matInput type="number" [(ngModel)]="nouvelArticle.remise" name="remise"
+                     (change)="calculerTotal()" min="0" max="100" step="1" />
+            </mat-form-field>
+          </div>
+
           <!-- Prix total -->
           <div class="col-lg-2">
             <mat-form-field appearance="outline" class="w-100">
               <mat-label>Prix Total</mat-label>
-              <input matInput type="number" [(ngModel)]="nouvelArticle.prixTotal" name="prixTotal" disabled />
+              <input matInput [value]="nouvelArticle.prixTotal | number:'1.2-2'" name="prixTotal" disabled />
             </mat-form-field>
           </div>
 
@@ -143,6 +152,19 @@
             <td mat-cell *matCellDef="let element"> {{element.prixUnitaire | number:'1.2-2'}} DH</td>
           </ng-container>
 
+          <!-- Colonne remise -->
+          <ng-container matColumnDef="remise">
+            <th mat-header-cell *matHeaderCellDef> Remise </th>
+            <td mat-cell *matCellDef="let element">
+            <span *ngIf="element.remise > 0" style="color: red; font-weight: 600;">
+              {{element.remise}}%
+            </span>
+                      <span *ngIf="!element.remise || element.remise === 0" style="color: grey;">
+              -
+            </span>
+            </td>
+          </ng-container>
+
           <!-- Colonne prix total -->
           <ng-container matColumnDef="prixTotal">
             <th mat-header-cell *matHeaderCellDef> Prix Total </th>
@@ -171,6 +193,17 @@
         <div class="row m-t-16" style="justify-content: flex-end">
           <div class="col-lg-3">
             <mat-card class="p-16">
+              <!-- Remise sur le devis -->
+              <div class="d-flex justify-content-between m-b-8">
+                <span>Remise devis (%):</span>
+                <mat-form-field appearance="outline" style="width: 80px; margin: -8px 0">
+                  <input matInput type="number"
+                         [(ngModel)]="remiseDevis"
+                         name="remiseDevis"
+                         (ngModelChange)="calculerTotaux()"
+                         min="0" max="100" step="1" />
+                </mat-form-field>
+              </div>
               <div class="d-flex justify-content-between m-b-8">
                 <span>Total HT:</span>
                 <span class="f-w-600">{{formatNumberForDisplay(totalHT) | number:'1.2-2'}} DH</span>
@@ -178,6 +211,10 @@
               <div class="d-flex justify-content-between m-b-8">
                 <span>TVA (20%):</span>
                 <span class="f-w-600">{{formatNumberForDisplay(tva) | number:'1.2-2'}} DH</span>
+              </div>
+              <div class="d-flex justify-content-between m-b-8" *ngIf="remiseDevis > 0">
+                <span>Remise ({{remiseDevis}}%):</span>
+                <span class="f-w-600 text-danger">-{{formatNumberForDisplay((totalHT + tva) * remiseDevis / 100) | number:'1.2-2'}} DH</span>
               </div>
               <div class="d-flex justify-content-between">
                 <span class="f-w-600">Total TTC:</span>
@@ -267,6 +304,19 @@
           <ng-container matColumnDef="montant">
             <th mat-header-cell *matHeaderCellDef>Montant</th>
             <td mat-cell *matCellDef="let element">{{element.montant}} DH</td>
+          </ng-container>
+
+          <!-- Remise Devis -->
+          <ng-container matColumnDef="remiseDevis">
+            <th mat-header-cell *matHeaderCellDef>Remise</th>
+            <td mat-cell *matCellDef="let element">
+              <span *ngIf="element.remiseDevis > 0" style="color: red; font-weight: 600;">
+                {{ element.remiseDevis }}%
+              </span>
+              <span *ngIf="!element.remiseDevis || element.remiseDevis === 0" style="color: grey;">
+                -
+              </span>
+            </td>
           </ng-container>
 
           <!-- Statut -->

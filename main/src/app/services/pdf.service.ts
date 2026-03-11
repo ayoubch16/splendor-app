@@ -52,10 +52,10 @@ export class PdfService {
     const articles = this.getArticlesFromDocument(document);
     const startY = 40 + this.HEADER_HEIGHT;
     const tableEndY = this.generateArticlesTable(doc, articles, margin, startY, options.type === 'BL');
-    const yPosition = tableEndY + 5; // Réduit la marge après le tableau
+    const yPosition = tableEndY + 5;
 
     if (options.type !== 'BL') {
-      this.addTotalsSection(doc, articles, pageWidth, margin, yPosition);
+      this.addTotalsSection(doc, articles, pageWidth, margin, yPosition, (document as any).remiseDevis || 0);
 
       if (options.withSignature) {
         await this.addSignature(doc, pageWidth, margin, yPosition);
@@ -133,7 +133,6 @@ export class PdfService {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.text('Signature et Cachet Fournisseur:', margin, yPosition + 40 + this.SIGNATURE_HEIGHT + 5);
-
       doc.text('Signature et Cachet Réception:', pageWidth - margin - 60, yPosition + 40);
       doc.rect(pageWidth - margin - 70, yPosition + 45, 60, 30);
 
@@ -187,23 +186,54 @@ export class PdfService {
     }
   }
 
-  private addTotalsSection(doc: jsPDF, articles: ArticleTableFacture[], pageWidth: number, margin: number, yPosition: number): void {
+  private addTotalsSection(
+    doc: jsPDF,
+    articles: ArticleTableFacture[],
+    pageWidth: number,
+    margin: number,
+    yPosition: number,
+    remiseDevis: number = 0
+  ): void {
     const totalHT = articles.reduce((sum, article) => sum + Number(article.prixTotal || 0), 0);
     const tva = totalHT * 0.2;
-    const totalTTC = totalHT + tva;
+    const totalAvantRemise = totalHT + tva;
+    const montantRemise = totalAvantRemise * (remiseDevis / 100);
+    const totalTTC = totalAvantRemise - montantRemise;
+
+    const boxHeight = remiseDevis > 0 ? 40 : 30;
 
     doc.setFillColor(240, 240, 240);
-    doc.rect(pageWidth / 2, yPosition, pageWidth / 2 - margin, 30, 'F');
+    doc.rect(pageWidth / 2, yPosition, pageWidth / 2 - margin, boxHeight, 'F');
 
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text('Total H.T', pageWidth / 2 + 5, yPosition + 7);
-    doc.text('T.V.A', pageWidth / 2 + 5, yPosition + 17);
-    doc.text('Total T.T.C', pageWidth / 2 + 5, yPosition + 27);
+    doc.text('T.V.A (20%)', pageWidth / 2 + 5, yPosition + 17);
 
     doc.setFont('helvetica', 'bold');
     doc.text(`${Number(totalHT).toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 7, { align: 'right' });
     doc.text(`${tva.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 17, { align: 'right' });
-    doc.text(`${totalTTC.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 27, { align: 'right' });
+
+    if (remiseDevis > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(200, 0, 0);
+      doc.text(`Remise (${remiseDevis}%)`, pageWidth / 2 + 5, yPosition + 27);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`-${montantRemise.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 27, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+
+      doc.setFont('helvetica', 'normal');
+      doc.text('Total T.T.C', pageWidth / 2 + 5, yPosition + 37);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${totalTTC.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 37, { align: 'right' });
+    } else {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Total T.T.C', pageWidth / 2 + 5, yPosition + 27);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${totalTTC.toFixed(2)} DH`, pageWidth - margin - 5, yPosition + 27, { align: 'right' });
+    }
   }
 
   private addTextSignature(doc: jsPDF, pageWidth: number, margin: number, yPosition: number): void {
@@ -229,21 +259,32 @@ export class PdfService {
     });
   }
 
-  private generateArticlesTable(doc: jsPDF, articles: ArticleTableFacture[], x: number, y: number, hidePrices: boolean = false): number {
+  private generateArticlesTable(
+    doc: jsPDF,
+    articles: ArticleTableFacture[],
+    x: number,
+    y: number,
+    hidePrices: boolean = false
+  ): number {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 10;
     const tableWidth = pageWidth - 2 * margin;
 
-    // Définir les largeurs de colonnes
-    const colDesignationWidth = tableWidth * 0.65;
-    const colQtyWidth = tableWidth * 0.10;
-    const colUnitPriceWidth = tableWidth * 0.10;
-    const colTotalWidth = tableWidth * 0.15;
+    // Vérifier si au moins un article a une remise > 0
+    const hasRemise = articles.some(a => Number((a as any).remise) > 0);
 
-    // En-têtes de colonnes
+    // Largeurs colonnes dynamiques
+    const colDesignationWidth = hasRemise ? tableWidth * 0.55 : tableWidth * 0.65;
+    const colQtyWidth         = tableWidth * 0.10;
+    const colUnitPriceWidth   = tableWidth * 0.10;
+    const colRemiseWidth      = hasRemise ? tableWidth * 0.10 : 0;
+    const colTotalWidth       = tableWidth * 0.15;
+
+    // En-têtes
     doc.setFillColor(50, 50, 50);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
     doc.rect(x, y, tableWidth, 10, 'F');
 
     if (hidePrices) {
@@ -253,7 +294,10 @@ export class PdfService {
       doc.text('Désignation', x + 5, y + 6);
       doc.text('Quantité', x + colDesignationWidth + 5, y + 6);
       doc.text('P.U.H.T', x + colDesignationWidth + colQtyWidth + 5, y + 6);
-      doc.text('Coût Total', x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + 5, y + 6);
+      if (hasRemise) {
+        doc.text('Remise', x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + 5, y + 6);
+      }
+      doc.text('Coût Total', x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + colRemiseWidth + 5, y + 6);
     }
 
     doc.setTextColor(0, 0, 0);
@@ -261,7 +305,6 @@ export class PdfService {
 
     let currentY = y + 10;
     const lineHeight = 15;
-    const maxDesignationHeight = 15;
 
     articles.forEach((article, index) => {
       if (index % 2 === 0) {
@@ -270,8 +313,11 @@ export class PdfService {
       }
 
       const designationLines = doc.splitTextToSize(article.designation, colDesignationWidth - 10);
-      const designationHeight = Math.min(designationLines.length * lineHeight, maxDesignationHeight);
-      const rowHeight = Math.max(lineHeight, designationHeight);
+      const rowHeight = lineHeight;
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
 
       doc.text(designationLines, x + 5, currentY + 6, {
         maxWidth: colDesignationWidth - 10,
@@ -282,16 +328,42 @@ export class PdfService {
         doc.text(article.quantite.toString(), x + colDesignationWidth + 5, currentY + 6);
       } else {
         doc.text(article.quantite.toString(), x + colDesignationWidth + 5, currentY + 6);
-        doc.text(`${Number(article.prixUnitaire).toFixed(2)} DH`,
-          x + colDesignationWidth + colQtyWidth + 5, currentY + 6);
-        doc.text(`${Number(article.prixTotal).toFixed(2)} DH`,
-          x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + 5, currentY + 6);
+        doc.text(
+          `${Number(article.prixUnitaire).toFixed(2)} DH`,
+          x + colDesignationWidth + colQtyWidth + 5,
+          currentY + 6
+        );
+
+        if (hasRemise) {
+          const remise = Number((article as any).remise || 0);
+          if (remise > 0) {
+            doc.setTextColor(200, 0, 0);
+            doc.text(
+              `${remise}%`,
+              x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + 5,
+              currentY + 6
+            );
+            doc.setTextColor(0, 0, 0);
+          } else {
+            doc.text(
+              '-',
+              x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + 5,
+              currentY + 6
+            );
+          }
+        }
+
+        doc.text(
+          `${Number(article.prixTotal).toFixed(2)} DH`,
+          x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + colRemiseWidth + 5,
+          currentY + 6
+        );
       }
 
       currentY += rowHeight;
     });
 
-    return currentY; // Retourne la position Y finale
+    return currentY;
   }
 
   downloadPdf(blob: Blob, filename: string): void {
