@@ -5,8 +5,10 @@ import {
 } from '@angular/core';
 import {
   provideHttpClient,
+  withInterceptors,
   withInterceptorsFromDi,
 } from '@angular/common/http';
+import { apiErrorInterceptor } from './interceptors/api-error.interceptor';
 import { routes } from './app.routes';
 import {
   provideRouter,
@@ -39,7 +41,7 @@ export const appConfig: ApplicationConfig = {
       }),
       withComponentInputBinding()
     ),
-    provideHttpClient(withInterceptorsFromDi()),
+    provideHttpClient(withInterceptorsFromDi(), withInterceptors([apiErrorInterceptor])),
     provideClientHydration(),
     provideAnimationsAsync(),
     importProvidersFrom(

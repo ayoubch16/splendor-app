@@ -87,20 +87,7 @@ export class PdfService {
   }
 
   private async addFooterImage(doc: jsPDF): Promise<void> {
-    try {
-      const pageHeight = doc.internal.pageSize.getHeight();
-      await this.addImageToPdf(
-        doc,
-        this.FOOTER_IMAGE,
-        0,
-        pageHeight - this.FOOTER_HEIGHT,
-        doc.internal.pageSize.getWidth(),
-        this.FOOTER_HEIGHT
-      );
-    } catch (error) {
-      console.error('Erreur lors du chargement de l\'image de pied de page:', error);
-      this.addFooterText(doc);
-    }
+    this.addFooterText(doc);
   }
 
   private async addSignature(doc: jsPDF, pageWidth: number, margin: number, yPosition: number): Promise<void> {
@@ -148,11 +135,106 @@ export class PdfService {
   private addFooterText(doc: jsPDF): void {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
+    // Couleur dorée/olive des labels (identique à l'image footer)
+    const gold: [number, number, number] = [139, 118, 54];
+    const dark: [number, number, number] = [50, 50, 50];
+    const cx = pageWidth / 2;
+    let y = pageHeight - 28;
 
-    doc.setFontSize(8);
+    // Ligne 1 : SPLENDOR ART (SPLENDOR en gras, ART en normal, même couleur dorée)
+    doc.setFontSize(9);
+    doc.setTextColor(...gold);
+    const splendorBold = 'SPLENDOR';
+    const artNormal = ' ART';
+    doc.setFont('helvetica', 'bold');
+    const splendorW = doc.getTextWidth(splendorBold);
     doc.setFont('helvetica', 'normal');
-    doc.text('SPLENDOR ART - 05 Apr 1, Rue Dakar - Océan, Rabat', pageWidth / 2, pageHeight - 10, { align: 'center' });
-    doc.text('Tél: +212 5 37 73 53 53 - Email: contact@splendorart.ma', pageWidth / 2, pageHeight - 5, { align: 'center' });
+    const artW = doc.getTextWidth(artNormal);
+    let x1 = cx - (splendorW + artW) / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text(splendorBold, x1, y); x1 += splendorW;
+    doc.setFont('helvetica', 'normal');
+    doc.text(artNormal, x1, y);
+
+    y += 5;
+    // Ligne 2 : Tél / E-mail
+    doc.setFontSize(8);
+    const telLabel = 'Tél:';
+    const telValue = ' 0663 681 902 \u2022 0660 399 921 \u2022 ';
+    const emailLabel = 'E-mail:';
+    const emailValue = ' contact@splendorart.ma';
+    doc.setFont('helvetica', 'bold');
+    const telLabelW = doc.getTextWidth(telLabel);
+    const emailLabelW = doc.getTextWidth(emailLabel);
+    doc.setFont('helvetica', 'normal');
+    const telValueW = doc.getTextWidth(telValue);
+    const emailValueW = doc.getTextWidth(emailValue);
+    let x2 = cx - (telLabelW + telValueW + emailLabelW + emailValueW) / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...gold);
+    doc.text(telLabel, x2, y); x2 += telLabelW;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...dark);
+    doc.text(telValue, x2, y); x2 += telValueW;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...gold);
+    doc.text(emailLabel, x2, y); x2 += emailLabelW;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...dark);
+    doc.text(emailValue, x2, y);
+
+    y += 5;
+    // Ligne 3 : Adresse
+    const addrLabel = 'Adresse:';
+    const addrValue = ' 05 Appt 1, rue Dakar, Ocean, Rabat-Maroc';
+    doc.setFont('helvetica', 'bold');
+    const addrLabelW = doc.getTextWidth(addrLabel);
+    doc.setFont('helvetica', 'normal');
+    const addrValueW = doc.getTextWidth(addrValue);
+    let x3 = cx - (addrLabelW + addrValueW) / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...gold);
+    doc.text(addrLabel, x3, y); x3 += addrLabelW;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...dark);
+    doc.text(addrValue, x3, y);
+
+    y += 3;
+    // Séparateur
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(0.3);
+    doc.line(cx - 25, y, cx + 25, y);
+
+    y += 5;
+    // Ligne 4 : identifiants fiscaux
+    const fiscals: { label: string; value: string; labelW?: number; valueW?: number }[] = [
+      { label: 'ICE:', value: ' 003538492000090' },
+      { label: ' \u2022 PATTENTE:', value: ' 26307670' },
+      { label: ' \u2022 RC:', value: ' 179247' },
+      { label: ' \u2022 IF:', value: ' 66001622' },
+      { label: ' \u2022 CNSS:', value: ' 5798332' },
+    ];
+    // Mesure des largeurs avec le bon font
+    let line4Width = 0;
+    for (const f of fiscals) {
+      doc.setFont('helvetica', 'bold');
+      f.labelW = doc.getTextWidth(f.label);
+      doc.setFont('helvetica', 'normal');
+      f.valueW = doc.getTextWidth(f.value);
+      line4Width += f.labelW + f.valueW;
+    }
+    let x4 = cx - line4Width / 2;
+    for (const f of fiscals) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...gold);
+      doc.text(f.label, x4, y); x4 += f.labelW!;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...dark);
+      doc.text(f.value, x4, y); x4 += f.valueW!;
+    }
+
+    // Réinitialiser la couleur de texte
+    doc.setTextColor(0, 0, 0);
   }
 
   private addHeader(doc: jsPDF, pageWidth: number): void {

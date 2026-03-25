@@ -1,0 +1,33 @@
+<div class="error-dialog-header">
+  <div class="error-dialog-title">
+    <mat-icon class="error-icon">error_outline</mat-icon>
+    <span>Erreur</span>
+  </div>
+  <button mat-icon-button class="close-btn" (click)="dialogRef.close()" aria-label="Fermer">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-divider></mat-divider>
+
+<div mat-dialog-content class="error-dialog-content">
+  <p class="error-message">{{ data.message }}</p>
+
+  <ul class="error-list" *ngIf="errorFields.length > 0">
+    <li *ngFor="let item of errorFields">
+      <strong>{{ item.field }}</strong> :
+      <span *ngFor="let msg of item.messages; let last = last">
+        {{ msg }}<span *ngIf="!last">, </span>
+      </span>
+    </li>
+  </ul>
+</div>
+
+<mat-divider></mat-divider>
+
+<div mat-dialog-actions align="end" class="error-dialog-actions">
+  <button mat-raised-button color="warn" (click)="dialogRef.close()">
+    <mat-icon>close</mat-icon>
+    Fermer
+  </button>
+</div>

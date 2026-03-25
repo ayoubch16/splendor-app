@@ -2,14 +2,14 @@ import { Injectable } from "@angular/core";
 import { HttpClient, HttpHeaders, HttpParams } from "@angular/common/http";
 import { Observable, catchError, map, throwError } from "rxjs";
 import { finalize } from "rxjs/operators";
+import { BASE_URL } from "../config";
 
 @Injectable({
   providedIn: 'root',
 })
 export class HttpService {
 
-  base_url = 'http://localhost:8000';
-  // base_url = 'https://splendorart.ma/app/api/index.php';
+  base_url = BASE_URL;
 
   constructor(
     private httpClient: HttpClient,

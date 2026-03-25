@@ -343,9 +343,8 @@ export class FormClientComponent implements OnInit, AfterViewInit {
             this.showSuccessMessage('Client supprimé avec succès');
             this.eventBusService.emit(Event.AJOUTER_CLIENT);
           },
-          error: (error) => {
-            const message = error.error?.message || 'Impossible de supprimer ce client car il possède des bons de livraison, devis ou factures associés.';
-            this.showErrorMessage(message); // ✅ affiche le message du backend
+          error: () => {
+            // Géré globalement par apiErrorInterceptor → ErrorDialogComponent
           }
         });
       }

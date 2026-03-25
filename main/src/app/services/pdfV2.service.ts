@@ -3,13 +3,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import {PdfViewerModalComponent} from "../components/pdf-viewer-modal/pdf-viewer-modal.component";
 import {MatDialog} from "@angular/material/dialog";
+import { BASE_URL } from "../config";
 
 @Injectable({
   providedIn: 'root'
 })
 export class PdfV2Service {
-  // private apiUrl = 'http://localhost:8000/api';
-  private apiUrl = 'https://splendorart.ma/app/api/index.php';
+  private apiUrl = BASE_URL;
 
 
   constructor(private http: HttpClient,
