@@ -1,0 +1,233 @@
+<mat-card class="cardWithShadow theme-card">
+  <mat-card-header>
+    <mat-card-title class="m-b-0">
+      {{ isEditMode ? 'Modifier Utilisateur' : 'Ajouter Utilisateur' }}
+    </mat-card-title>
+  </mat-card-header>
+  <mat-card-content class="b-t-1">
+    <form [formGroup]="userForm" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-lg-6">
+          <mat-label class="f-w-600 m-b-8 d-block">Nom d'utilisateur*</mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <input matInput formControlName="username" placeholder="Nom d'utilisateur" />
+            <mat-error *ngIf="userForm.get('username')?.hasError('required')">
+              Ce champ est obligatoire
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-6">
+          <mat-label class="f-w-600 m-b-8 d-block">Email*</mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <input matInput formControlName="email" type="email" placeholder="Email" />
+            <mat-error *ngIf="userForm.get('email')?.hasError('required')">
+              Ce champ est obligatoire
+            </mat-error>
+            <mat-error *ngIf="userForm.get('email')?.hasError('email')">
+              Veuillez entrer un email valide
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-6">
+          <mat-label class="f-w-600 m-b-8 d-block">Prénom*</mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <input matInput formControlName="first_name" placeholder="Prénom" />
+            <mat-error *ngIf="userForm.get('first_name')?.hasError('required')">
+              Ce champ est obligatoire
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-6">
+          <mat-label class="f-w-600 m-b-8 d-block">Nom*</mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <input matInput formControlName="last_name" placeholder="Nom" />
+            <mat-error *ngIf="userForm.get('last_name')?.hasError('required')">
+              Ce champ est obligatoire
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-6">
+          <mat-label class="f-w-600 m-b-8 d-block">Rôle*</mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-select formControlName="role" placeholder="Sélectionner un rôle">
+              <mat-option *ngFor="let role of visibleRoleOptions" [value]="role.value">
+                {{ role.label }}
+              </mat-option>
+            </mat-select>
+            <mat-error *ngIf="userForm.get('role')?.hasError('required')">
+              Ce champ est obligatoire
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-6"></div>
+
+        <div class="col-lg-6">
+          <mat-label class="f-w-600 m-b-8 d-block">
+            Mot de passe{{ isEditMode ? '' : '*' }}
+          </mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <input matInput formControlName="password" type="password"
+                   [placeholder]="isEditMode ? 'Laisser vide pour ne pas changer' : 'Mot de passe'" />
+            <mat-error *ngIf="userForm.get('password')?.hasError('required')">
+              Ce champ est obligatoire
+            </mat-error>
+            <mat-error *ngIf="userForm.get('password')?.hasError('minlength')">
+              Le mot de passe doit contenir au moins 8 caractères
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-6">
+          <mat-label class="f-w-600 m-b-8 d-block">Confirmer le mot de passe</mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <input matInput formControlName="confirmPassword" type="password"
+                   placeholder="Confirmer le mot de passe" />
+            <mat-error *ngIf="userForm.get('confirmPassword')?.hasError('passwordMismatch')">
+              Les mots de passe ne correspondent pas
+            </mat-error>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="m-t-12">
+        <button mat-flat-button color="primary" class="m-r-8" type="submit" [disabled]="userForm.invalid || isLoading">
+          <span *ngIf="!isLoading">{{ isEditMode ? 'Modifier' : 'Ajouter' }}</span>
+          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+        </button>
+        <button mat-stroked-button color="warn" type="button" (click)="resetForm()" [disabled]="isLoading">
+          Annuler
+        </button>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>
+
+<!-- Tableau des utilisateurs avec filtres : visible pour tous les rôles, actions réservées à ADMIN/SUPER_ADMIN -->
+<mat-card class="cardWithShadow theme-card m-t-16">
+  <mat-card-header>
+    <mat-card-title class="m-b-0">Liste des Utilisateurs</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <!-- Section filtres -->
+    <div class="row m-b-16">
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Nom d'utilisateur</mat-label>
+          <input matInput [(ngModel)]="filtreUsername" (input)="appliquerFiltres()"
+                 placeholder="Filtrer par nom d'utilisateur">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Email</mat-label>
+          <input matInput [(ngModel)]="filtreEmail" (input)="appliquerFiltres()"
+                 placeholder="Filtrer par email">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Rôle</mat-label>
+          <mat-select [(ngModel)]="filtreRole" (selectionChange)="appliquerFiltres()">
+            <mat-option value="">Tous</mat-option>
+            <mat-option *ngFor="let role of visibleRoleOptions" [value]="role.value">
+              {{ role.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Statut</mat-label>
+          <mat-select [(ngModel)]="filtreStatut" (selectionChange)="appliquerFiltres()">
+            <mat-option value="">Tous</mat-option>
+            <mat-option value="actif">Actif</mat-option>
+            <mat-option value="inactif">Inactif</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="m-b-16">
+      <button mat-stroked-button type="button" (click)="reinitialiserFiltres()">
+        Réinitialiser les filtres
+      </button>
+    </div>
+
+    <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
+      <!-- Colonne Nom d'utilisateur -->
+      <ng-container matColumnDef="username">
+        <th mat-header-cell *matHeaderCellDef>Nom d'utilisateur</th>
+        <td mat-cell *matCellDef="let user">{{ user.username }}</td>
+      </ng-container>
+
+      <!-- Colonne Nom complet -->
+      <ng-container matColumnDef="nomComplet">
+        <th mat-header-cell *matHeaderCellDef>Nom complet</th>
+        <td mat-cell *matCellDef="let user">{{ user.first_name }} {{ user.last_name }}</td>
+      </ng-container>
+
+      <!-- Colonne Email -->
+      <ng-container matColumnDef="email">
+        <th mat-header-cell *matHeaderCellDef>Email</th>
+        <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+      </ng-container>
+
+      <!-- Colonne Rôle -->
+      <ng-container matColumnDef="role">
+        <th mat-header-cell *matHeaderCellDef>Rôle</th>
+        <td mat-cell *matCellDef="let user">{{ getRoleLabel(user.role) }}</td>
+      </ng-container>
+
+      <!-- Colonne Statut -->
+      <ng-container matColumnDef="statut">
+        <th mat-header-cell *matHeaderCellDef>Statut</th>
+        <td mat-cell *matCellDef="let user">
+          <span class="f-w-600 p-x-12 p-y-4 rounded"
+                [ngClass]="user.isActive ? 'bg-light-success text-success' : 'bg-light-error text-error'">
+            {{ user.isActive ? 'Actif' : 'Inactif' }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Colonne Actions -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let user">
+          <button mat-icon-button color="primary" (click)="editUser(user)"
+                  [disabled]="!canEditUser(user)"
+                  [matTooltip]="editTooltip(user)">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-icon-button [color]="user.isActive ? 'warn' : 'primary'"
+                  (click)="toggleStatut(user)"
+                  [disabled]="!canToggleStatus(user)"
+                  [matTooltip]="toggleTooltip(user)">
+            <mat-icon>{{ user.isActive ? 'block' : 'check_circle' }}</mat-icon>
+          </button>
+          <button mat-icon-button color="warn" (click)="deleteUser(user)"
+                  [disabled]="!canManageUser(user)"
+                  [matTooltip]="deleteTooltip(user)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+    <mat-paginator
+      [pageSize]="10"
+      [pageSizeOptions]="[10, 20, 50]"
+      showFirstLastButtons>
+    </mat-paginator>
+
+  </mat-card-content>
+</mat-card>

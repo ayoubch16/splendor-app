@@ -1,0 +1,235 @@
+import { Injectable } from "@angular/core";
+import { HttpClient } from '@angular/common/http';
+import {map, Observable} from "rxjs";
+import {
+  Article,
+  Bl, CategoriesData,
+  CategoryArticle,
+  Client,
+  Devis,
+  Facture,
+  StatutBL, StatutDevis, StatutFacture,
+  User,
+  Ville, VillesData
+} from "../interfaces/entites";
+import {endpoints} from "../const/endpoints";
+import {HttpService} from "./http.service";
+
+
+
+@Injectable({
+  providedIn: 'root'
+})
+export class DataService {
+
+  constructor(private http: HttpClient,
+              private httpService : HttpService) {
+  }
+
+  //**************** Article **********************************
+
+  getArticles(): Observable<Article[]> {
+    return this.httpService.get(endpoints.article.list)
+  }
+
+  saveArticle(article: Article): Observable<Article> {
+    return this.httpService.post(endpoints.article.create, article)
+  }
+
+  updateArticle(id:number , article: Article): Observable<Article> {
+    return this.httpService.put(endpoints.article.update(id),article)
+  }
+
+  deleteArticle(id: number): Observable<void> {
+    return this.httpService.delete(endpoints.article.delete(id));
+  }
+
+  getCategories(): Observable<CategoryArticle[]> {
+    return this.http.get<CategoriesData>('assets/data/categories.json')
+      .pipe(
+        map(data => data.categories)
+      );
+  }
+
+
+//**************** Clients **********************************
+
+  getClients(): Observable<Client[]> {
+    return this.httpService.get(endpoints.client.list)
+  }
+
+  saveClient(client: Client): Observable<Client> {
+    return this.httpService.post(endpoints.client.create, client)
+  }
+
+  updateClient(id:number , client: Client): Observable<Client> {
+    return this.httpService.put(endpoints.client.update(id),client)
+  }
+
+  deleteClient(id: number): Observable<void> {
+    return this.httpService.delete(endpoints.client.delete(id));
+  }
+
+  getVilles(): Observable<Ville[]> {
+    return this.http.get<VillesData>('assets/data/villes.json')
+      .pipe(
+        map(data => data.villes)
+      );
+  }
+
+  getVilleById(id: number): Observable<Ville> {
+    return this.getVilles().pipe(
+      map(villes => {
+        const ville = villes.find(v => v.id === id);
+        if (!ville) {
+          throw new Error(`Ville avec l'ID ${id} non trouvée`);
+        }
+        return ville;
+      })
+    );
+  }
+
+
+//************************* Shared ***************************************//
+  getCptFacture(): Observable<number>{
+    return this.httpService.get(endpoints.shared.getCptFacture)
+  }
+
+  getCptDevis(): Observable<number> {
+    return this.httpService.get(endpoints.shared.getCptDevis)
+  }
+
+  getCptBl(): Observable<number> {
+    return this.httpService.get(endpoints.shared.getCptBl)
+  }
+
+  /** Envoie un document par email : le PDF généré côté front est transmis encodé en base64. */
+  sendEmail(emailData: {to: string, subject: string, message: string}, pdfFile: File): Observable<any> {
+    return new Observable(observer => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Pdf = (reader.result as string).split(',')[1];
+        this.httpService.post(endpoints.shared.sendEmail, {
+          to: emailData.to,
+          subject: emailData.subject,
+          message: emailData.message,
+          pdfBase64: base64Pdf,
+          pdfFileName: pdfFile.name
+        }, { useToken: true }).subscribe(observer);
+      };
+      reader.onerror = () => observer.error(reader.error);
+      reader.readAsDataURL(pdfFile);
+    });
+  }
+
+
+  //************************* User ***************************************//
+  getUsers(): Observable<User[]> {
+    return this.httpService.get(endpoints.user.list)
+  }
+
+  getUser(id:number): Observable<User> {
+    return this.httpService.get(endpoints.user.getUser(id))
+  }
+
+  saveUser(userData: User) :Observable<any> {
+    return this.httpService.post(endpoints.user.create,userData);
+  }
+
+  updateUser(id:number,updatedUser: any):Observable<any> {
+    return this.httpService.put(endpoints.user.update(id),updatedUser);
+  }
+
+  deleteUser(id: number): Observable<void> {
+    return this.httpService.delete(endpoints.user.delete(id));
+  }
+
+  activateUser(id: number): Observable<User> {
+    return this.httpService.patch(endpoints.user.activate(id), {});
+  }
+
+  deactivateUser(id: number): Observable<User> {
+    return this.httpService.patch(endpoints.user.deactivate(id), {});
+  }
+
+  //************************* Devis ***************************************//
+  getAllDevis(): Observable<Devis[]> {
+    return this.httpService.get(endpoints.devis.list)
+  }
+
+  getLastDevis(): Observable<Devis[]> {
+    return this.httpService.get(endpoints.devis.listLast)
+  }
+
+  createDevis(devisData: Devis): Observable<Devis> {
+    return this.httpService.post(endpoints.devis.create, devisData)
+  }
+
+  updateDevis(id: number, updatedDevis: Devis): Observable<Devis> {
+    return this.httpService.put(endpoints.devis.update(id), updatedDevis)
+  }
+
+  updateDevisStatut(id: number, statut: StatutDevis): Observable<Devis> {
+    return this.httpService.put(endpoints.devis.updateStatut(id,statut),null)
+  }
+
+  deleteDevis(id: number): Observable<void> {
+    return this.httpService.delete(endpoints.devis.delete(id))
+  }
+
+
+
+  //************************* Facture ***************************************//
+
+  createFacture(id:number): Observable<Facture> {
+    return this.httpService.post(endpoints.facture.create(id),null)
+  }
+
+  getFactures(): Observable<Facture[]> {
+    return this.httpService.get(endpoints.facture.list)
+  }
+
+  getLastFactures(): Observable<Facture[]> {
+    return this.httpService.get(endpoints.facture.listLast)
+  }
+
+  updateFacture(id:number,facture: Facture): Observable<Facture> {
+    return this.httpService.put(endpoints.facture.update(id),facture)
+  }
+
+  deleteFacture(id: number): Observable<void> {
+    return this.httpService.delete(endpoints.facture.delete(id))
+  }
+
+  updateFactureStatut(id: number, statut: StatutFacture): Observable<Facture> {
+    return this.httpService.put(endpoints.facture.updateStatut(id,statut), {})
+  }
+
+
+  //************************* BL ***************************************//
+
+  createBl(id:number): Observable<Bl> {
+    return this.httpService.post(endpoints.bl.create(id),null)
+  }
+
+  getBls(): Observable<Bl[]> {
+    return this.httpService.get(endpoints.bl.list)
+  }
+
+  getLastBls(): Observable<Bl[]> {
+    return this.httpService.get(endpoints.bl.listLast)
+  }
+
+  updateBl(id:number,bl: Bl): Observable<Bl> {
+    return this.httpService.put(endpoints.bl.update(id),bl)
+  }
+
+  deleteBl(id: number): Observable<void> {
+    return this.httpService.delete(endpoints.bl.delete(id))
+  }
+
+  updateBlStatut(id: number, statut: StatutBL): Observable<Bl> {
+    return this.httpService.put(endpoints.bl.updateStatut(id,statut),null)
+  }
+
+}

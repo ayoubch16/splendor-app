@@ -1,0 +1,113 @@
+
+  /* Style général de la carte */
+mat-card {
+  max-width: 450px;
+  margin: 2rem auto;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+
+  mat-card-header {
+    justify-content: center;
+    margin-bottom: 1.5rem;
+
+    mat-card-title {
+      font-size: 1.8rem;
+      font-weight: 500;
+      color: #3f51b5; // Couleur primaire
+    }
+  }
+}
+
+/* Style du formulaire */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  mat-form-field {
+    width: 100%;
+
+    /* Style des labels */
+    mat-label {
+      color: rgba(0, 0, 0, 0.6);
+      font-weight: 500;
+    }
+
+    /* Style des inputs */
+    .mat-input-element {
+      padding: 0.5em 0;
+      font-size: 1rem;
+    }
+
+    /* Style du contour quand le champ est focus */
+    &.mat-focused .mat-form-field-outline-thick {
+      color: #3f51b5;
+    }
+  }
+}
+
+/* Style du bouton de soumission */
+button[type="submit"] {
+  margin-top: 0.5rem;
+  padding: 0.8rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(63, 81, 181, 0.2);
+  }
+
+  /* Style du spinner */
+  mat-spinner {
+    margin: 0 auto;
+
+    ::ng-deep circle {
+      stroke: white;
+    }
+  }
+}
+
+/* Style des messages d'erreur */
+.error-message {
+  color: #f44336;
+  background-color: #fdecea;
+  padding: 0.8rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+mat-error {
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+  color: #f44336;
+}
+
+/* Animation pour les messages d'erreur */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+  mat-card {
+    margin: 1rem;
+    padding: 1.5rem;
+
+    mat-card-title {
+      font-size: 1.5rem;
+    }
+  }
+
+  button[type="submit"] {
+    padding: 0.7rem;
+    font-size: 1rem;
+  }
+}

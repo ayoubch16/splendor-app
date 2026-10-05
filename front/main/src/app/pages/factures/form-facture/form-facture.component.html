@@ -1,0 +1,292 @@
+<mat-card class="cardWithShadow theme-card">
+  <mat-card-header>
+    <mat-card-title class="m-b-0">Modification de Facture</mat-card-title>
+  </mat-card-header>
+  <mat-card-content class="b-t-1">
+    <form *ngIf="isEditMode">
+      <div class="row" style="justify-content: space-between">
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Client</mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="clientName" name="client" type="text" required [disabled]="true"/>
+          </mat-form-field>
+        </div>
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Date</mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="factureDate" name="date" type="date" required />
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content: end">
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Numéro Facture</mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="factureNumber" name="numFacture" disabled />
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content: end">
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Numéro Bon de Commande </mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="bcNumber" name="bcNumber" />
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="article-table-container m-t-20 m-b-20">
+        <h3 class="m-b-16">Liste des articles</h3>
+        <div class="row m-b-16">
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-select (selectionChange)="onArticleSelected($event)" name="articleSelect">
+                <mat-option value="">-- Sélectionner un article --</mat-option>
+                @for (option of listeArticle ; track option.id) {
+                  <mat-option [value]="option">
+                    {{ option.nameArticle }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Description</mat-label>
+              <textarea matInput cdkTextareaAutosize [(ngModel)]="nouvelArticle.description" name="description"></textarea>
+            </mat-form-field>
+          </div>
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Quantité</mat-label>
+              <input matInput type="number" [(ngModel)]="nouvelArticle.quantite" name="quantite"
+                     (change)="calculerTotal()" min="1" required />
+            </mat-form-field>
+          </div>
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Prix unitaire</mat-label>
+              <input matInput type="number" [(ngModel)]="nouvelArticle.prixUnitaire" name="prixUnitaire"
+                     (change)="calculerTotal()" min="0" step="0.01" required />
+            </mat-form-field>
+          </div>
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Prix Total</mat-label>
+              <input matInput type="number" [(ngModel)]="nouvelArticle.prixTotal" name="prixTotal" disabled />
+            </mat-form-field>
+          </div>
+          <div class="col-lg-2 d-flex align-items-center">
+            <button mat-stroked-button color="primary" (click)="ajouterArticle()" class="m-r-8">
+              {{ modeEdition ? 'Modifier' : 'Ajouter' }} l'article
+            </button>
+          </div>
+        </div>
+
+        <table mat-table [dataSource]="articles" class="w-100 mat-elevation-z1">
+          <ng-container matColumnDef="#">
+            <th mat-header-cell *matHeaderCellDef> # </th>
+            <td mat-cell *matCellDef="let element; let i = index"> {{i + 1}} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="designation">
+            <th mat-header-cell *matHeaderCellDef> Désignation </th>
+            <td mat-cell *matCellDef="let element"> {{element.designation}} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef> Description </th>
+            <td mat-cell *matCellDef="let element"> {{element.description}} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="quantite">
+            <th mat-header-cell *matHeaderCellDef> Quantité </th>
+            <td mat-cell *matCellDef="let element"> {{element.quantite}} </td>
+          </ng-container>
+
+          <ng-container matColumnDef="prixUnitaire">
+            <th mat-header-cell *matHeaderCellDef> Prix unitaire </th>
+            <td mat-cell *matCellDef="let element"> {{element.prixUnitaire | number:'1.2-2'}} DH</td>
+          </ng-container>
+
+          <ng-container matColumnDef="prixTotal">
+            <th mat-header-cell *matHeaderCellDef> Prix Total </th>
+            <td mat-cell *matCellDef="let element"> {{element.prixTotal | number:'1.2-2'}} DH</td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef> Action </th>
+            <td mat-cell *matCellDef="let element; let i = index">
+              <button mat-stroked-button color="info" (click)="modifierArticle(i)" class="m-r-8">
+                Modifier
+              </button>
+              <button mat-stroked-button color="warn" (click)="supprimerArticle(i)">
+                Supprimer
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="colonnesAffichees"></tr>
+          <tr mat-row *matRowDef="let row; columns: colonnesAffichees;"></tr>
+        </table>
+
+        <div class="row m-t-16" style="justify-content: flex-end">
+          <div class="col-lg-3">
+            <mat-card class="p-16">
+              <div class="d-flex justify-content-between m-b-8">
+                <span>Total HT:</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalHT) | number:'1.2-2'}} DH</span>
+              </div>
+              <div class="d-flex justify-content-between m-b-8">
+                <span>TVA (20%):</span>
+                <span class="f-w-600">{{formatNumberForDisplay(tva) | number:'1.2-2'}} DH</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span class="f-w-600">Total TTC:</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalTTC) | number:'1.2-2'}} DH</span>
+              </div>
+            </mat-card>
+          </div>
+        </div>
+      </div>
+
+      <div class="m-t-12">
+        <button mat-flat-button color="primary" class="m-r-8"
+                (click)="enregistrerFacture()" [disabled]="!canSaveFacture || isLoading">
+          <span *ngIf="!isLoading">Modifier la facture</span>
+          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+        </button>
+        <button mat-stroked-button color="warn" (click)="resetForm()" [disabled]="isLoading">
+          Annuler
+        </button>
+      </div>
+    </form>
+
+    <!-- Section filtres -->
+    <h3 class="m-t-32 m-b-10  ">Filtrer les factures</h3>
+    <div class="row ">
+
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Numéro</mat-label>
+          <input matInput [(ngModel)]="filtreNumero" name="filtreNumero"
+                 (input)="appliquerFiltres()" placeholder="Rechercher par numéro">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Client</mat-label>
+          <input matInput [(ngModel)]="filtreClient" name="filtreClient"
+                 (input)="appliquerFiltres()" placeholder="Rechercher par client">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Statut</mat-label>
+          <mat-select [(ngModel)]="filtreStatut" name="filtreStatut"
+                      (selectionChange)="appliquerFiltres()">
+            <mat-option [value]="null">Tous</mat-option>
+            @for (statut of statutsFacture; track statut) {
+              <mat-option [value]="statut">{{ statut }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Date de début</mat-label>
+          <input matInput [(ngModel)]="filtreDateDebut" name="filtreDateDebut"
+                 type="date" (change)="appliquerFiltres()">
+        </mat-form-field>
+      </div>
+
+      <div class="col-lg-2">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Date de fin</mat-label>
+          <input matInput [(ngModel)]="filtreDateFin" name="filtreDateFin"
+                 type="date" (change)="appliquerFiltres()">
+        </mat-form-field>
+      </div>
+    </div>
+
+    <!-- Liste des factures existantes -->
+    <div class="m-t-32">
+      <h3>Liste des factures</h3>
+
+      <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
+        <!-- Numéro Facture -->
+        <ng-container matColumnDef="numFacture">
+          <th mat-header-cell *matHeaderCellDef>Numéro</th>
+          <td mat-cell *matCellDef="let element">{{element.numFacture}}</td>
+        </ng-container>
+
+        <!-- Client -->
+        <ng-container matColumnDef="clientName">
+          <th mat-header-cell *matHeaderCellDef>Client</th>
+          <td mat-cell *matCellDef="let element">{{element.client.raisonSociale}}</td>
+        </ng-container>
+
+        <!-- Montant -->
+        <ng-container matColumnDef="montant">
+          <th mat-header-cell *matHeaderCellDef>Montant</th>
+          <td mat-cell *matCellDef="let element">{{element.montant}} DH</td>
+        </ng-container>
+
+        <!-- Statut -->
+        <ng-container matColumnDef="statut">
+          <th mat-header-cell *matHeaderCellDef>Statut</th>
+          <td mat-cell *matCellDef="let element">{{element.statut}}</td>
+        </ng-container>
+
+        <!-- Date -->
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let element">{{element.date | date:'dd/MM/yyyy'}}</td>
+        </ng-container>
+
+        <!-- Actions -->
+        <ng-container matColumnDef="menu">
+          <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14"></th>
+          <td mat-cell *matCellDef="let element">
+            <button mat-icon-button [matMenuTriggerFor]="menu">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #menu="matMenu" xPosition="before">
+              <button mat-menu-item (click)="viewFacturePdf(element)">
+                <mat-icon>visibility</mat-icon> Consulter
+              </button>
+              <button mat-menu-item (click)="editFacture(element)">
+                <mat-icon>edit</mat-icon> Modifier
+              </button>
+              <button mat-menu-item (click)="changerStatut(element)">
+                <mat-icon>swap_vert</mat-icon> Changer Statut
+              </button>
+              <button mat-menu-item (click)="deleteFacture(element)">
+                <mat-icon>delete</mat-icon> Supprimer
+              </button>
+              <app-download-facture [facture]="element"></app-download-facture>
+              <app-download-facture-print [facture]="element"></app-download-facture-print>
+              <button mat-menu-item (click)="envoyerParMail(element)">
+                <mat-icon>email</mat-icon> Envoyer Par mail
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
+      </table>
+      <mat-paginator
+        [pageSize]="5"
+        [pageSizeOptions]="[5, 10, 20]"
+        showFirstLastButtons>
+      </mat-paginator>
+    </div>
+  </mat-card-content>
+</mat-card>

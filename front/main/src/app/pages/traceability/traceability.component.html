@@ -1,0 +1,88 @@
+<mat-card class="cardWithShadow theme-card">
+  <mat-card-header>
+    <mat-card-title class="m-b-0">Historiques</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <div class="table-container">
+      <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
+
+        <!-- Colonne timestamp -->
+        <ng-container matColumnDef="timestamp">
+          <th mat-header-cell *matHeaderCellDef>Date/Heure</th>
+          <td mat-cell *matCellDef="let historique">
+            {{ historique.timestamp | date:'dd/MM/yyyy HH:mm:ss' }}
+          </td>
+        </ng-container>
+
+        <!-- Colonne operationType -->
+        <ng-container matColumnDef="operationType">
+          <th mat-header-cell *matHeaderCellDef>Type d'opération</th>
+          <td mat-cell *matCellDef="let historique">{{ historique.operationType }}</td>
+        </ng-container>
+
+        <!-- Colonne entityType -->
+        <ng-container matColumnDef="entityType">
+          <th mat-header-cell *matHeaderCellDef>Type d'entité</th>
+          <td mat-cell *matCellDef="let historique">{{ historique.entityType }}</td>
+        </ng-container>
+
+        <!-- Colonne entityId -->
+        <ng-container matColumnDef="entityId">
+          <th mat-header-cell *matHeaderCellDef>ID Entité</th>
+          <td mat-cell *matCellDef="let historique">{{ historique.entityId }}</td>
+        </ng-container>
+
+        <!-- Colonne userName -->
+        <ng-container matColumnDef="userName">
+          <th mat-header-cell *matHeaderCellDef>Utilisateur</th>
+          <td mat-cell *matCellDef="let historique">{{ historique.userName }}</td>
+        </ng-container>
+
+        <!-- Colonne details -->
+        <ng-container matColumnDef="details">
+          <th mat-header-cell *matHeaderCellDef>Détails</th>
+          <td mat-cell *matCellDef="let historique">{{ historique.details }}</td>
+        </ng-container>
+
+        <!-- Colonne previousState - Affiche seulement pour STATUS_CHANGE -->
+        <ng-container matColumnDef="previousState">
+          <th mat-header-cell *matHeaderCellDef>État précédent</th>
+          <td mat-cell *matCellDef="let historique">
+            <ng-container *ngIf="historique.operationType === OperationType.STATUS_CHANGE; else notApplicable">
+              {{ historique.previousState?.statut || 'Non défini' }}
+            </ng-container>
+            <ng-template #notApplicable>
+              <span class="text-muted"></span>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Colonne newState - Affiche seulement pour STATUS_CHANGE -->
+        <ng-container matColumnDef="newState">
+          <th mat-header-cell *matHeaderCellDef>Nouvel état</th>
+          <td mat-cell *matCellDef="let historique">
+            <ng-container *ngIf="historique.operationType === OperationType.STATUS_CHANGE; else notApplicable">
+              {{ historique.newState?.statut || 'Non défini' }}
+            </ng-container>
+            <ng-template #notApplicable>
+              <span class="text-muted"></span>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Définition des lignes -->
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+        <!-- Message quand aucune donnée -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            Aucune opération trouvée
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+  </mat-card-content>
+</mat-card>

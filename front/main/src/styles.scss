@@ -1,0 +1,159 @@
+/* You can add global styles to this file, and also import other style files */
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.custom-dialog-container {
+  position: relative;
+}
+
+.custom-close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 50px;
+  height: 50px;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+
+  &:hover {
+    background-color: #d32f2f;
+  }
+}
+
+/* Styles pour le PDF généré */
+.pdf-container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.pdf-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+}
+
+.pdf-logo {
+  max-width: 200px;
+}
+
+.pdf-facture-info {
+  text-align: right;
+}
+
+.pdf-facture-info h1 {
+  margin: 0;
+  color: #333;
+}
+
+.pdf-client-info {
+  margin-bottom: 20px;
+}
+
+.pdf-client-info h2 {
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.pdf-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 30px;
+}
+
+.pdf-table th {
+  background-color: #333;
+  color: white;
+  padding: 10px;
+  text-align: left;
+}
+
+.pdf-table td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.pdf-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.pdf-totals {
+  width: 300px;
+  margin-left: auto;
+  margin-bottom: 50px;
+}
+
+.pdf-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.pdf-total-row.total {
+  font-weight: bold;
+  border-top: 1px solid #333;
+  padding-top: 10px;
+}
+
+.pdf-signature {
+  margin-top: 50px;
+  text-align: right;
+  font-style: italic;
+}
+button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+mat-paginator {
+  background: transparent;
+  margin-top: 16px;
+}
+
+.mat-paginator-page-size-select {
+  margin: 0 8px;
+}
+
+
+.filtres-section {
+  background-color: #f5f5f5;
+  border-radius: 4px;
+
+  h3 {
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 500;
+  }
+}
+.text-muted {
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Style pour les cellules N/A */
+.mat-cell .text-muted {
+  opacity: 0.6;
+}
+
+/* Supprimer les flèches haut/bas des inputs number */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}

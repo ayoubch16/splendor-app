@@ -1,0 +1,118 @@
+<mat-card class="shadow-none" [ngClass]="getCardClass()">
+  <mat-card-header>
+    <mat-card-title class="f-s-16 f-w-500 text-muted">
+      <div class="d-flex justify-content-between align-items-center ">
+        <div class="d-flex align-items-center gap-12">
+          <div class="rounded-circle-shape p-x-16 p-y-8 rounded-pill d-flex align-items-center justify-content-center" [ngClass]="getIconClass()">
+            <i class="iconify f-s-24 text-white" data-icon="hugeicons:invoice"></i>
+          </div>
+          <mat-card-title class="m-b-0 f-s-16 f-w-500 text-muted">Derniers {{typeDocument}}s</mat-card-title>
+        </div>
+      </div>
+    </mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <div class="table-responsive">
+      <table mat-table [dataSource]="listeFichiers" class="w-100">
+
+        <!-- Numéro Column -->
+        <ng-container matColumnDef="numero">
+          <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14">Numéro</th>
+          <td mat-cell *matCellDef="let element">
+            <ng-container [ngSwitch]="typeDocument">
+              <span style="display: flex;justify-content: center;align-items: center;" *ngSwitchCase="'DEVIS'">{{ element.numDevis }}<button mat-menu-item (click)="consulterDevis(element)"><mat-icon>visibility</mat-icon></button></span>
+              <span style="display: flex;justify-content: center;align-items: center;" *ngSwitchCase="'FACTURE'">{{ element.numFacture }}<button mat-menu-item (click)="consulterFacture(element)"><mat-icon>visibility</mat-icon></button></span>
+              <span style="display: flex;justify-content: center;align-items: center;" *ngSwitchCase="'BL'">{{ element.numBl }}<button mat-menu-item (click)="consulterBl(element)"><mat-icon>visibility</mat-icon></button></span>
+              <span style="display: flex;justify-content: center;align-items: center;" *ngSwitchDefault>{{ element.id }}</span>
+            </ng-container>
+
+          </td>
+        </ng-container>
+
+        <!-- Client Column -->
+        <ng-container matColumnDef="client">
+          <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14">Client</th>
+          <td mat-cell *matCellDef="let element">{{ element.client?.raisonSociale}}</td>
+        </ng-container>
+
+        <!-- Montant Column (Conditionnel pour BL) -->
+        <ng-container matColumnDef="montant" *ngIf="typeDocument !== 'BL'">
+          <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14">Montant</th>
+          <td mat-cell *matCellDef="let element">{{ element.montant }} DH</td>
+        </ng-container>
+
+        <!-- Statut Column -->
+        <ng-container matColumnDef="statut">
+          <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14">Statut</th>
+          <td mat-cell *matCellDef="let element">
+            <span class="badge">
+              {{ element.statut }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Date Column -->
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14">Date</th>
+          <td mat-cell *matCellDef="let element">{{ element.date | date:'dd/MM/yyyy' }}</td>
+        </ng-container>
+
+        <!-- Menu Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14"></th>
+          <td mat-cell *matCellDef="let element">
+            <button mat-icon-button [matMenuTriggerFor]="menu">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #menu="matMenu" xPosition="before">
+              <ng-container [ngSwitch]="typeDocument">
+                <!-- Devis -->
+                <ng-container *ngSwitchCase="'DEVIS'">
+                  <button mat-menu-item>
+                    <app-download-devis [devis]="element"></app-download-devis>
+                  </button>
+                  <button mat-menu-item>
+                    <app-download-devis-print [devis]="element"></app-download-devis-print>
+                  </button>
+                </ng-container>
+
+                <!-- Bon de Livraison -->
+                <ng-container *ngSwitchCase="'BL'">
+                  <button mat-menu-item>
+                    <app-download-bl [bl]="element"></app-download-bl>
+                  </button>
+                  <button mat-menu-item>
+                    <app-download-bl-print [bl]="element"></app-download-bl-print>
+                  </button>
+                </ng-container>
+
+                <!-- Facture -->
+                <ng-container *ngSwitchCase="'FACTURE'">
+                  <button mat-menu-item>
+                    <app-download-facture [facture]="element"></app-download-facture>
+                  </button>
+                  <button mat-menu-item>
+                    <app-download-facture-print [facture]="element"></app-download-facture-print>
+                  </button>
+                </ng-container>
+
+                <!-- Par défaut -->
+                <ng-container *ngSwitchDefault>
+                  <button mat-menu-item>
+                    <mat-icon>file_download</mat-icon> Télécharger
+                  </button>
+                  <button mat-menu-item>
+                    <mat-icon>print</mat-icon> Imprimer
+                  </button>
+                </ng-container>
+              </ng-container>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="getDisplayedColumns()"></tr>
+        <tr mat-row *matRowDef="let row; columns: getDisplayedColumns()"></tr>
+      </table>
+    </div>
+  </mat-card-content>
+</mat-card>

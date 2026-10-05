@@ -1,0 +1,20 @@
+<mat-card class="shadow-none" [ngClass]="getCardClass()">
+  <mat-card-content>
+    <div class="d-flex justify-content-between align-items-center m-b-20 p-b-2">
+      <div class="d-flex align-items-center gap-12">
+        <div class="rounded-circle-shape p-x-16 p-y-8 rounded-pill d-flex align-items-center justify-content-center" [ngClass]="getIconClass()">
+          <i class="iconify f-s-24 text-white" data-icon="hugeicons:invoice"></i>
+        </div>
+        <mat-card-title class="m-b-0 f-s-16 f-w-500 text-muted">Nombre Des {{typeDocument}}</mat-card-title>
+      </div>
+    </div>
+    <div class="row align-items-end justify-content-between">
+      <div class="col-12">
+        <h2 class="f-s-30 lh-lg m-b-12 text-center">
+          {{nombreDocuments}}
+        </h2>
+
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>

@@ -1,0 +1,377 @@
+<mat-card class="cardWithShadow theme-card">
+  <mat-card-header>
+    <mat-card-title class="m-b-0">Formulaire de Devis</mat-card-title>
+  </mat-card-header>
+  <mat-card-content class="b-t-1">
+    <form>
+      <!-- En-tête du devis -->
+      <div class="row" style="justify-content: space-between">
+        <!-- Sélection du client -->
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Client</mat-label>
+          <mat-form-field appearance="outline" class="w-100">
+            <input type="text" matInput [formControl]="clientFilterCtrl" [matAutocomplete]="auto" placeholder="Rechercher un client...">
+            <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayClient" (optionSelected)="onClientSelected($event)">
+              @for (client of filteredClients; track client.id) {
+                <mat-option [value]="client">{{client.raisonSociale}}</mat-option>
+              }
+            </mat-autocomplete>
+          </mat-form-field>
+        </div>
+
+        <!-- Date du devis -->
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Date</mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="devisDate" name="date" type="date" required />
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- Numéro du devis -->
+      <div class="row" style="justify-content: end">
+        <div class="col-lg-4">
+          <mat-label class="f-w-600 m-b-8 d-block">Numéro</mat-label>
+          <mat-form-field appearance="outline" class="w-100" color="primary">
+            <input matInput [(ngModel)]="devisNumber" name="numDevis" disabled />
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- Section articles -->
+      <div class="article-table-container m-t-20 m-b-20">
+        <h3 class="m-b-16">Liste des articles</h3>
+
+        <!-- Formulaire d'ajout d'article -->
+        <div class="row m-b-16">
+          <!-- Recherche d'article -->
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <input type="text" matInput [formControl]="articleFilterCtrl" [matAutocomplete]="auto1" placeholder="Rechercher un article ...">
+              <mat-autocomplete #auto1="matAutocomplete" [displayWith]="displayArticle" (optionSelected)="onArticleSelected($event)">
+                @for (article of filteredArticles; track article.id) {
+                  <mat-option [value]="article">{{article.nameArticle}}</mat-option>
+                }
+              </mat-autocomplete>
+            </mat-form-field>
+          </div>
+
+          <!-- Bouton nouvel article -->
+          <div class="col-lg-1 d-flex">
+            <button mat-stroked-button color="accent" (click)="ouvrirFormulaireArticle()" class="m-r-8">
+               +
+            </button>
+          </div>
+
+          <!-- Description de l'article -->
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Description</mat-label>
+              <textarea matInput cdkTextareaAutosize [(ngModel)]="nouvelArticle.description" name="description"></textarea>
+            </mat-form-field>
+          </div>
+
+          <!-- Quantité -->
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Quantité</mat-label>
+              <input matInput type="number" [(ngModel)]="nouvelArticle.quantite" name="quantite"
+                     (change)="calculerTotal()" min="1" required />
+            </mat-form-field>
+          </div>
+
+          <!-- Prix unitaire -->
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Prix unitaire</mat-label>
+              <input matInput type="number" [(ngModel)]="nouvelArticle.prixUnitaire" name="prixUnitaire"
+                     (change)="calculerTotal()" min="0" step="0.01" required />
+            </mat-form-field>
+          </div>
+
+          <!-- Remise article -->
+          <div class="col-lg-1">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Remise (%)</mat-label>
+              <input matInput type="number" [(ngModel)]="nouvelArticle.remise" name="remise"
+                     (change)="calculerTotal()" min="0" max="100" step="1" />
+            </mat-form-field>
+          </div>
+
+          <!-- Prix total -->
+          <div class="col-lg-2">
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Prix Total</mat-label>
+              <input matInput [value]="nouvelArticle.prixTotal | number:'1.2-2'" name="prixTotal" disabled />
+            </mat-form-field>
+          </div>
+
+          <!-- Bouton d'ajout -->
+          <div class="col-lg-1">
+            <button mat-stroked-button color="primary" (click)="ajouterArticle()" class="m-r-8">
+              {{ modeEdition ? 'Modifier' : 'Ajouter' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Tableau des articles -->
+        <table mat-table [dataSource]="articles" class="w-100 mat-elevation-z1">
+          <!-- Colonne numéro -->
+          <ng-container matColumnDef="#">
+            <th mat-header-cell *matHeaderCellDef> # </th>
+            <td mat-cell *matCellDef="let element; let i = index"> {{i + 1}} </td>
+          </ng-container>
+
+          <!-- Colonne désignation -->
+          <ng-container matColumnDef="designation">
+            <th mat-header-cell *matHeaderCellDef> Désignation </th>
+            <td mat-cell *matCellDef="let element"> {{element.designation}} </td>
+          </ng-container>
+
+          <!-- Colonne description -->
+          <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef> Description </th>
+            <td mat-cell *matCellDef="let element"> {{element.description}} </td>
+          </ng-container>
+
+          <!-- Colonne catégorie -->
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef> Category </th>
+            <td mat-cell *matCellDef="let element"> {{element.categoryArticle?.category}} </td>
+          </ng-container>
+
+          <!-- Colonne quantité -->
+          <ng-container matColumnDef="quantite">
+            <th mat-header-cell *matHeaderCellDef> Quantité </th>
+            <td mat-cell *matCellDef="let element"> {{element.quantite}} </td>
+          </ng-container>
+
+          <!-- Colonne prix unitaire -->
+          <ng-container matColumnDef="prixUnitaire">
+            <th mat-header-cell *matHeaderCellDef> Prix unitaire </th>
+            <td mat-cell *matCellDef="let element"> {{element.prixUnitaire | number:'1.2-2'}} DH</td>
+          </ng-container>
+
+          <!-- Colonne remise -->
+          <ng-container matColumnDef="remise">
+            <th mat-header-cell *matHeaderCellDef> Remise </th>
+            <td mat-cell *matCellDef="let element">
+            <span *ngIf="element.remise > 0" style="color: red; font-weight: 600;">
+              {{element.remise}}%
+            </span>
+                      <span *ngIf="!element.remise || element.remise === 0" style="color: grey;">
+              -
+            </span>
+            </td>
+          </ng-container>
+
+          <!-- Colonne prix total -->
+          <ng-container matColumnDef="prixTotal">
+            <th mat-header-cell *matHeaderCellDef> Prix Total </th>
+            <td mat-cell *matCellDef="let element"> {{element.prixTotal | number:'1.2-2'}} DH</td>
+          </ng-container>
+
+          <!-- Colonne actions -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef> Action </th>
+            <td mat-cell *matCellDef="let element; let i = index">
+              <button mat-stroked-button color="info" (click)="modifierArticle(i)" class="m-r-8">
+                Modifier
+              </button>
+              <button mat-stroked-button color="warn" (click)="supprimerArticle(i)">
+                Supprimer
+              </button>
+            </td>
+          </ng-container>
+
+          <!-- Définition des lignes -->
+          <tr mat-header-row *matHeaderRowDef="colonnesAffichees"></tr>
+          <tr mat-row *matRowDef="let row; columns: colonnesAffichees;"></tr>
+        </table>
+
+        <!-- Résumé des totaux -->
+        <div class="row m-t-16" style="justify-content: flex-end">
+          <div class="col-lg-3">
+            <mat-card class="p-16">
+              <!-- Remise sur le devis -->
+              <div class="d-flex justify-content-between m-b-8">
+                <span>Remise devis (%):</span>
+                <mat-form-field appearance="outline" style="width: 80px; margin: -8px 0">
+                  <input matInput type="number"
+                         [(ngModel)]="remiseDevis"
+                         name="remiseDevis"
+                         (ngModelChange)="calculerTotaux()"
+                         min="0" max="100" step="1" />
+                </mat-form-field>
+              </div>
+              <div class="d-flex justify-content-between m-b-8">
+                <span>Total HT:</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalHT) | number:'1.2-2'}} DH</span>
+              </div>
+              <div class="d-flex justify-content-between m-b-8">
+                <span>TVA (20%):</span>
+                <span class="f-w-600">{{formatNumberForDisplay(tva) | number:'1.2-2'}} DH</span>
+              </div>
+              <div class="d-flex justify-content-between m-b-8" *ngIf="remiseDevis > 0">
+                <span>Remise ({{remiseDevis}}%):</span>
+                <span class="f-w-600 text-danger">-{{formatNumberForDisplay((totalHT + tva) * remiseDevis / 100) | number:'1.2-2'}} DH</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span class="f-w-600">Total TTC:</span>
+                <span class="f-w-600">{{formatNumberForDisplay(totalTTC) | number:'1.2-2'}} DH</span>
+              </div>
+            </mat-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- Boutons d'action -->
+      <div class="m-t-12">
+        <button mat-flat-button color="primary" class="m-r-8"
+                (click)="enregistrerDevis()" [disabled]="!canSaveDevis || isLoading">
+          <span *ngIf="!isLoading">{{ currentDevisId ? 'Modifier' : 'Enregistrer' }} le devis</span>
+          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+        </button>
+        <button mat-stroked-button color="warn" (click)="resetForm()" [disabled]="isLoading">
+          Annuler
+        </button>
+      </div>
+
+      <!-- Section filtres -->
+      <h3 class="m-t-32 m-b-10">Filtrer les devis</h3>
+      <div class="row ">
+        <div class="col-lg-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Numéro</mat-label>
+            <input matInput [(ngModel)]="filtreNumero" (input)="appliquerFiltres()"
+                   name="filtreNumero" placeholder="Rechercher par numéro">
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Client</mat-label>
+            <input matInput [(ngModel)]="filtreClient" (input)="appliquerFiltres()"
+                   name="filtreClient" placeholder="Rechercher par client">          </mat-form-field>
+        </div>
+
+        <div class="col-lg-2">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Statut</mat-label>
+            <mat-select [(ngModel)]="filtreStatut" (selectionChange)="appliquerFiltres()"
+                        name="filtreStatut">
+              <mat-option [value]="null">Tous</mat-option>
+              <mat-option *ngFor="let statut of statutsDevis" [value]="statut">
+                {{ statut }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="col-lg-2">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Date de début</mat-label>
+            <input matInput [(ngModel)]="filtreDateDebut" type="date" (change)="appliquerFiltres()"
+                   name="filtreDateDebut">          </mat-form-field>
+        </div>
+
+        <div class="col-lg-2">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Date de fin</mat-label>
+            <input matInput [(ngModel)]="filtreDateFin" type="date" (change)="appliquerFiltres()">
+          </mat-form-field>
+        </div>
+      </div>
+
+      <!-- Liste des devis existants -->
+      <div class="m-t-32">
+        <h3>Liste des devis</h3>
+
+        <table mat-table [dataSource]="dataSource" class="w-100 mat-elevation-z1">
+          <!-- Numéro Devis -->
+          <ng-container matColumnDef="numDevis">
+            <th mat-header-cell *matHeaderCellDef>Numéro</th>
+            <td mat-cell *matCellDef="let element">{{element.numDevis}}</td>
+          </ng-container>
+
+          <!-- Client -->
+          <ng-container matColumnDef="clientName">
+            <th mat-header-cell *matHeaderCellDef>Client</th>
+            <td mat-cell *matCellDef="let element">{{element.client?.raisonSociale}}</td>
+          </ng-container>
+
+          <!-- Montant -->
+          <ng-container matColumnDef="montant">
+            <th mat-header-cell *matHeaderCellDef>Montant</th>
+            <td mat-cell *matCellDef="let element">{{element.montant}} DH</td>
+          </ng-container>
+
+          <!-- Remise Devis -->
+          <ng-container matColumnDef="remiseDevis">
+            <th mat-header-cell *matHeaderCellDef>Remise</th>
+            <td mat-cell *matCellDef="let element">
+              <span *ngIf="element.remiseDevis > 0" style="color: red; font-weight: 600;">
+                {{ element.remiseDevis }}%
+              </span>
+              <span *ngIf="!element.remiseDevis || element.remiseDevis === 0" style="color: grey;">
+                -
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Statut -->
+          <ng-container matColumnDef="statut">
+            <th mat-header-cell *matHeaderCellDef>Statut</th>
+            <td mat-cell *matCellDef="let element">{{element.statut}}</td>
+          </ng-container>
+
+          <!-- Date -->
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let element">{{element.date | date:'dd/MM/yyyy'}}</td>
+          </ng-container>
+
+          <!-- Actions -->
+          <ng-container matColumnDef="menu">
+            <th mat-header-cell *matHeaderCellDef class="mat-subtitle-1 f-s-14"></th>
+            <td mat-cell *matCellDef="let element">
+              <button mat-icon-button [matMenuTriggerFor]="menu">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu" xPosition="before">
+                <button mat-menu-item (click)="consulterDevis(element)">
+                  <mat-icon>visibility</mat-icon> Consulter
+                </button>
+                <button mat-menu-item (click)="editDevis(element)">
+                  <mat-icon>edit</mat-icon> Modifier
+                </button>
+                <button mat-menu-item (click)="changerStatut(element)">
+                  <mat-icon>swap_vert</mat-icon> Changer Statut
+                </button>
+                <button mat-menu-item (click)="deleteDevis(element)">
+                  <mat-icon>delete</mat-icon> Supprimer
+                </button>
+                <button mat-menu-item *ngIf="!element.factureExistante"
+                        (click)="genererFacture(element)">
+                  <mat-icon>request_page</mat-icon> Générer Facture
+                </button>
+                <button mat-menu-item *ngIf="!element.blExistante"
+                        (click)="genererBonLivraison(element)">
+                  <mat-icon>request_page</mat-icon> Générer BL
+                </button>
+                <app-download-devis [devis]="element"></app-download-devis>
+                <app-download-devis-print [devis]="element"></app-download-devis-print>
+              </mat-menu>
+            </td>
+          </ng-container>
+
+          <!-- Définition des lignes -->
+          <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
+        </table>
+        <!-- Ajoutez le paginator après le tableau -->
+        <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>

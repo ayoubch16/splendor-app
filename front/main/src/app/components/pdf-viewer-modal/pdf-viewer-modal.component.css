@@ -1,0 +1,14 @@
+.pdf-viewer-container {
+  max-width: 100%;
+}
+
+.pdf-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pdf-iframe {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}

@@ -1,0 +1,40 @@
+<mat-toolbar class="topbar gap-8">
+  <!-- Mobile Burger Menu (visible uniquement sur mobile) -->
+  <button
+    mat-icon-button
+    class="d-md-none d-flex justify-content-center"
+    (click)="toggleMobileNav.emit()"
+    aria-label="Toggle navigation"
+  >
+    <i class="iconify icon-20" data-icon="solar:hamburger-menu-line-duotone"></i>
+  </button>
+
+
+  <mat-menu #menu="matMenu">
+    <!-- Ton contenu ici -->
+  </mat-menu>
+
+  <span class="flex-1-auto"></span>
+
+  <!-- --------------------------------------------------------------- -->
+  <!-- Profile Dropdown -->
+  <!-- --------------------------------------------------------------- -->
+  <button
+    mat-icon-button
+    [matMenuTriggerFor]="profilemenu"
+    aria-label="Profile"
+    class="d-flex align-items-center justify-content-center profile-btn-dd"
+  >
+    <img
+      src="https://splendorart.ma/boss-120x120.png"
+      alt="user 1"
+      class="rounded-circle object-cover icon-35 profile-dd"
+      width="35"
+    />
+  </button>
+  <mat-menu #profilemenu="matMenu" class="topbar-dd cardWithShadow">
+    <div class="p-x-12 m-t-12">
+      <button mat-stroked-button (click)="logout()" class="w-100">Logout</button>
+    </div>
+  </mat-menu>
+</mat-toolbar>
