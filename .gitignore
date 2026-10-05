@@ -6,3 +6,6 @@
 # Système
 .DS_Store
 Thumbs.db
+
+# Notes pour Claude Code (locales, non versionnées)
+CLAUDE.md

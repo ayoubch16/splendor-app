@@ -4,8 +4,8 @@ Application de gestion commerciale de Splendor Art (devis, factures, bons de liv
 
 | Dossier | Contenu |
 |---|---|
-| `backend/` | API REST Laravel 8 (voir `backend/CLAUDE.md`) |
-| `front/` | Application Angular 19, dans `front/main` (voir `front/CLAUDE.md`) |
+| `backend/` | API REST Laravel 8 |
+| `front/` | Application Angular 19, dans `front/main` |
 
 ## Démarrage
 
