@@ -22,6 +22,12 @@ export class PdfService {
   private readonly FOOTER_HEIGHT = 30;
   private readonly SIGNATURE_HEIGHT = 30;
   private readonly SIGNATURE_WIDTH = 80;
+  private readonly BOTTOM_CONTENT_MARGIN = 35;
+  private readonly CONTINUATION_START_Y = this.HEADER_HEIGHT + 10;
+  private readonly TABLE_HEADER_HEIGHT = 10;
+  private readonly ROW_HEIGHT = 15;
+  private readonly TABLE_TOTALS_GAP = 5;
+  private readonly TOTALS_SIGNATURE_GAP = 10;
 
   generateDocumentPdf(document: PdfDocument, options: PdfOptions): Promise<Blob> {
     switch(options.type) {
@@ -49,16 +55,36 @@ export class PdfService {
     this.addClientInfo(doc, this.getClientFromDocument(document), margin);
     this.addDocumentInfo(doc, document, options.type, pageWidth, margin);
 
-    const articles = this.getArticlesFromDocument(document);
+    const articles = this.getArticlesFromDocument(document) || [];
     const startY = 40 + this.HEADER_HEIGHT;
-    const tableEndY = this.generateArticlesTable(doc, articles, margin, startY, options.type === 'BL');
-    const yPosition = tableEndY + 5;
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // La remise est resolue avant la mise en page : elle determine la hauteur du bloc totaux.
+    const remise = options.type !== 'BL' ? this.resolveRemisePercent(document, articles) : 0;
+    const tailHeight = this.getTailHeight(options, remise);
+
+    // Repartition des lignes page par page en reservant la place du bloc final,
+    // pour ne jamais produire une page qui ne contiendrait que les totaux.
+    const rowsPerPage = this.planTablePagination(articles.length, startY, tailHeight, pageHeight);
+
+    const tableEndY = await this.generateArticlesTable(
+      doc, articles, margin, startY, options.type === 'BL', rowsPerPage
+    );
+    let yPosition = tableEndY + this.TABLE_TOTALS_GAP;
+
+    // Filet de securite : la pagination reserve deja la place, ceci ne devrait pas se declencher.
+    if (yPosition + tailHeight > pageHeight - this.BOTTOM_CONTENT_MARGIN) {
+      doc.addPage();
+      await this.addHeaderImage(doc);
+      yPosition = this.CONTINUATION_START_Y;
+    }
 
     if (options.type !== 'BL') {
-      this.addTotalsSection(doc, articles, pageWidth, margin, yPosition, (document as any).remiseDevis || 0);
+      this.addTotalsSection(doc, articles, pageWidth, margin, yPosition, remise);
 
       if (options.withSignature) {
-        await this.addSignature(doc, pageWidth, margin, yPosition);
+        const signatureY = yPosition + this.getTotalsBoxHeight(remise) + this.TOTALS_SIGNATURE_GAP;
+        await this.addSignature(doc, pageWidth, margin, signatureY);
       }
     } else {
       if (options.withSignature) {
@@ -87,22 +113,26 @@ export class PdfService {
   }
 
   private async addFooterImage(doc: jsPDF): Promise<void> {
-    this.addFooterText(doc);
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      this.addFooterText(doc);
+    }
   }
 
-  private async addSignature(doc: jsPDF, pageWidth: number, margin: number, yPosition: number): Promise<void> {
+  private async addSignature(doc: jsPDF, pageWidth: number, margin: number, signatureY: number): Promise<void> {
     try {
       await this.addImageToPdf(
         doc,
         this.SIGNATURE_IMAGE,
         pageWidth - margin - this.SIGNATURE_WIDTH - 10,
-        yPosition + 40,
+        signatureY,
         this.SIGNATURE_WIDTH,
         this.SIGNATURE_HEIGHT
       );
     } catch (error) {
       console.error('Erreur lors du chargement de l\'image de signature:', error);
-      this.addTextSignature(doc, pageWidth, margin, yPosition);
+      this.addTextSignature(doc, pageWidth, margin, signatureY);
     }
   }
 
@@ -261,11 +291,86 @@ export class PdfService {
 
     doc.text(`${documentLabel}: N° ${documentNumber}`, pageWidth - margin, 10 + this.HEADER_HEIGHT, { align: 'right' });
     if (document.numBC != null && type !== TypeDocument.DEVIS) {
-      doc.text(`Bonne de Commande: N° ${document.numBC}`, pageWidth - margin, 17 + this.HEADER_HEIGHT, { align: 'right' });
+      doc.text(`BON DE COMMANDE: N° ${document.numBC}`, pageWidth - margin, 17 + this.HEADER_HEIGHT, { align: 'right' });
       doc.text(`DATE: ${new Date(document.date).toLocaleDateString('fr-FR')}`, pageWidth - margin, 24 + this.HEADER_HEIGHT, { align: 'right' });
     } else {
       doc.text(`DATE: ${new Date(document.date).toLocaleDateString('fr-FR')}`, pageWidth - margin, 17 + this.HEADER_HEIGHT, { align: 'right' });
     }
+  }
+
+  private resolveRemisePercent(document: any, articles: ArticleTableFacture[]): number {
+    const explicit = Number(document?.remiseDevis);
+    if (!isNaN(explicit) && explicit > 0) {
+      return explicit;
+    }
+    const montantStocke = Number(document?.montant);
+    if (!montantStocke || isNaN(montantStocke)) return 0;
+    const totalHT = articles.reduce((sum, a) => sum + Number(a.prixTotal || 0), 0);
+    const totalCalculeTTC = totalHT * 1.2;
+    if (totalCalculeTTC <= 0) return 0;
+    const ratio = montantStocke / totalCalculeTTC;
+    if (ratio >= 0.9999) return 0;
+    return Math.round((1 - ratio) * 10000) / 100;
+  }
+
+  /** Hauteur de l'encadre des totaux : une ligne supplementaire quand une remise est affichee. */
+  private getTotalsBoxHeight(remisePercent: number): number {
+    return remisePercent > 0 ? 40 : 30;
+  }
+
+  /**
+   * Hauteur reelle du bloc qui suit le tableau (totaux + signature), mesuree depuis
+   * la premiere ligne de ce bloc. Sert a reserver la place pendant la pagination.
+   */
+  private getTailHeight(options: GeneratePdfOptions, remisePercent: number): number {
+    if (options.type === 'BL') {
+      return options.withSignature ? 80 : 10;
+    }
+    const boxHeight = this.getTotalsBoxHeight(remisePercent);
+    return options.withSignature
+      ? boxHeight + this.TOTALS_SIGNATURE_GAP + this.SIGNATURE_HEIGHT
+      : boxHeight;
+  }
+
+  /**
+   * Nombre de lignes d'articles a poser sur chaque page.
+   * La place du bloc final est reservee sur la derniere page, et au moins une ligne
+   * d'article y est conservee : les totaux ne se retrouvent jamais seuls sur une page.
+   */
+  private planTablePagination(
+    articleCount: number,
+    firstPageStartY: number,
+    tailHeight: number,
+    pageHeight: number
+  ): number[] {
+    const bottomLimit = pageHeight - this.BOTTOM_CONTENT_MARGIN;
+    const rowCapacity = (tableStartY: number, reserve: number): number =>
+      Math.floor((bottomLimit - tableStartY - this.TABLE_HEADER_HEIGHT - reserve) / this.ROW_HEIGHT);
+
+    if (articleCount <= 0) return [0];
+
+    const plan: number[] = [];
+    let remaining = articleCount;
+    let startY = firstPageStartY;
+
+    while (remaining > 0) {
+      const capacityFull = Math.max(1, rowCapacity(startY, 0));
+      const capacityWithTail = Math.max(1, rowCapacity(startY, tailHeight + this.TABLE_TOTALS_GAP));
+
+      if (remaining <= capacityWithTail) {
+        plan.push(remaining);
+        break;
+      }
+
+      // Cette page ne sera pas la derniere : on la remplit sans descendre sous
+      // la capacite « avec totaux », et on laisse au moins une ligne a la page suivante.
+      const take = Math.min(capacityFull, Math.max(capacityWithTail, remaining - 1));
+      plan.push(take);
+      remaining -= take;
+      startY = this.CONTINUATION_START_Y;
+    }
+
+    return plan;
   }
 
   private addTotalsSection(
@@ -282,7 +387,7 @@ export class PdfService {
     const montantRemise = totalAvantRemise * (remiseDevis / 100);
     const totalTTC = totalAvantRemise - montantRemise;
 
-    const boxHeight = remiseDevis > 0 ? 40 : 30;
+    const boxHeight = this.getTotalsBoxHeight(remiseDevis);
 
     doc.setFillColor(240, 240, 240);
     doc.rect(pageWidth / 2, yPosition, pageWidth / 2 - margin, boxHeight, 'F');
@@ -318,11 +423,11 @@ export class PdfService {
     }
   }
 
-  private addTextSignature(doc: jsPDF, pageWidth: number, margin: number, yPosition: number): void {
+  private addTextSignature(doc: jsPDF, pageWidth: number, margin: number, signatureY: number): void {
     doc.setFont('helvetica', 'italic');
-    doc.text('SPLENDOR ART', pageWidth - margin - 40, yPosition + 60);
-    doc.text('05 Apr 1, Rue Dakar', pageWidth - margin - 40, yPosition + 67);
-    doc.text('Océan - Rabat', pageWidth - margin - 40, yPosition + 74);
+    doc.text('SPLENDOR ART', pageWidth - margin - 40, signatureY + 20);
+    doc.text('05 Apr 1, Rue Dakar', pageWidth - margin - 40, signatureY + 27);
+    doc.text('Océan - Rabat', pageWidth - margin - 40, signatureY + 34);
   }
 
   private async addImageToPdf(doc: jsPDF, imageUrl: string, x: number, y: number, width: number, height: number): Promise<void> {
@@ -341,16 +446,18 @@ export class PdfService {
     });
   }
 
-  private generateArticlesTable(
+  private async generateArticlesTable(
     doc: jsPDF,
     articles: ArticleTableFacture[],
     x: number,
     y: number,
-    hidePrices: boolean = false
-  ): number {
+    hidePrices: boolean = false,
+    rowsPerPage: number[] = []
+  ): Promise<number> {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 10;
     const tableWidth = pageWidth - 2 * margin;
+    const lineHeight = this.ROW_HEIGHT;
 
     // Vérifier si au moins un article a une remise > 0
     const hasRemise = articles.some(a => Number((a as any).remise) > 0);
@@ -362,33 +469,48 @@ export class PdfService {
     const colRemiseWidth      = hasRemise ? tableWidth * 0.10 : 0;
     const colTotalWidth       = tableWidth * 0.15;
 
-    // En-têtes
-    doc.setFillColor(50, 50, 50);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.rect(x, y, tableWidth, 10, 'F');
+    const drawHeaderRow = (yStart: number): number => {
+      doc.setFillColor(50, 50, 50);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.rect(x, yStart, tableWidth, this.TABLE_HEADER_HEIGHT, 'F');
 
-    if (hidePrices) {
-      doc.text('Désignation', x + 5, y + 6);
-      doc.text('Quantité', x + colDesignationWidth + 5, y + 6);
-    } else {
-      doc.text('Désignation', x + 5, y + 6);
-      doc.text('Quantité', x + colDesignationWidth + 5, y + 6);
-      doc.text('P.U.H.T', x + colDesignationWidth + colQtyWidth + 5, y + 6);
-      if (hasRemise) {
-        doc.text('Remise', x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + 5, y + 6);
+      if (hidePrices) {
+        doc.text('Désignation', x + 5, yStart + 6);
+        doc.text('Quantité', x + colDesignationWidth + 5, yStart + 6);
+      } else {
+        doc.text('Désignation', x + 5, yStart + 6);
+        doc.text('Quantité', x + colDesignationWidth + 5, yStart + 6);
+        doc.text('P.U.H.T', x + colDesignationWidth + colQtyWidth + 5, yStart + 6);
+        if (hasRemise) {
+          doc.text('Remise', x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + 5, yStart + 6);
+        }
+        doc.text('Coût Total', x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + colRemiseWidth + 5, yStart + 6);
       }
-      doc.text('Coût Total', x + colDesignationWidth + colQtyWidth + colUnitPriceWidth + colRemiseWidth + 5, y + 6);
-    }
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
 
-    let currentY = y + 10;
-    const lineHeight = 15;
+      return yStart + this.TABLE_HEADER_HEIGHT;
+    };
 
-    articles.forEach((article, index) => {
+    let currentY = drawHeaderRow(y);
+    let pageIndex = 0;
+    let rowsDrawnOnPage = 0;
+
+    for (let index = 0; index < articles.length; index++) {
+      const article = articles[index];
+      const maxRowsOnPage = Math.max(1, rowsPerPage[pageIndex] ?? articles.length);
+
+      if (rowsDrawnOnPage >= maxRowsOnPage) {
+        doc.addPage();
+        await this.addHeaderImage(doc);
+        currentY = drawHeaderRow(this.CONTINUATION_START_Y);
+        pageIndex++;
+        rowsDrawnOnPage = 0;
+      }
+
       if (index % 2 === 0) {
         doc.setFillColor(245, 245, 245);
         doc.rect(x, currentY, tableWidth, lineHeight, 'F');
@@ -443,7 +565,8 @@ export class PdfService {
       }
 
       currentY += rowHeight;
-    });
+      rowsDrawnOnPage++;
+    }
 
     return currentY;
   }

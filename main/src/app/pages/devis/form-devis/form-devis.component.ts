@@ -417,14 +417,16 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
 
   calculerTotaux(): void {
     const articles = this.articlesSubject.value;
-    this.totalHT = articles.reduce((sum, article) => {
-      const prixTotal = typeof article.prixTotal === 'string'
-        ? parseFloat(article.prixTotal)
-        : article.prixTotal;
-      return sum + (isNaN(prixTotal) ? 0 : prixTotal);
-    }, 0);
+    this.totalHT = articles.reduce((sum, article) => sum + this.calculerPrixTotalArticle(article), 0);
     this.tva = this.totalHT * 0.2;
     this.totalTTC = (this.totalHT + this.tva) * (1 - (this.remiseDevis || 0) / 100);
+  }
+
+  /** Recalcule prixTotal depuis quantite/prixUnitaire/remise, plutôt que de se fier à la valeur stockée. */
+  private calculerPrixTotalArticle(article: ArticleTable): number {
+    const prixBrut = (article.quantite ?? 0) * (article.prixUnitaire ?? 0);
+    const remise = article.remise || 0;
+    return prixBrut * (1 - remise / 100);
   }
 
   async enregistrerDevis(): Promise<void> {
@@ -466,9 +468,9 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
       articles: this.articles.map(article => ({
         designation: article.designation,
         description: article.description,
-        quantite: article.quantite,
-        prixUnitaire: article.prixUnitaire,
-        prixTotal: article.prixTotal,
+        quantite: article.quantite ?? 0,
+        prixUnitaire: article.prixUnitaire ?? 0,
+        prixTotal: this.calculerPrixTotalArticle(article),
         remise: article.remise || 0
       }))
     };
@@ -517,9 +519,9 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
     const articles: ArticleTable[] = devis.articles.map(article => ({
       designation: article.designation,
       description: article.description,
-      quantite: article.quantite,
-      prixUnitaire: article.prixUnitaire,
-      prixTotal: article.prixTotal,
+      quantite: article.quantite ?? 0,
+      prixUnitaire: article.prixUnitaire ?? 0,
+      prixTotal: this.calculerPrixTotalArticle(article),
       remise: article.remise || 0
     }));
     this.remiseDevis = devis.remiseDevis || 0;

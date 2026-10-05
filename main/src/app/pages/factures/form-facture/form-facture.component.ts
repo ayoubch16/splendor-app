@@ -272,7 +272,10 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
 
   calculerTotaux(): void {
     const articles = this.articlesSubject.value;
-    this.totalHT = articles.reduce((sum, article) => sum + article.prixTotal, 0);
+    this.totalHT = articles.reduce((sum, article) => {
+      const prixTotal = (article.quantite ?? 0) * (article.prixUnitaire ?? 0);
+      return sum + prixTotal;
+    }, 0);
     this.tva = this.totalHT * 0.2;
     this.totalTTC = this.totalHT + this.tva;
   }
@@ -360,9 +363,9 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     const articles: ArticleTable[] = facture.articles.map(article => ({
       designation: article.designation,
       description: article.description,
-      quantite: article.quantite,
-      prixUnitaire: article.prixUnitaire,
-      prixTotal: article.prixTotal
+      quantite: article.quantite ?? 0,
+      prixUnitaire: article.prixUnitaire ?? 0,
+      prixTotal: (article.quantite ?? 0) * (article.prixUnitaire ?? 0)
     }));
 
     this.articlesSubject.next(articles);

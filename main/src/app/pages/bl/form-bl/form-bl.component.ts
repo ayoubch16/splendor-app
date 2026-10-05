@@ -298,9 +298,9 @@ export class FormBlComponent implements OnInit, AfterViewInit {
       articles: this.articles.map(article => ({
         designation: article.designation,
         description: article.description,
-        quantite: article.quantite,
-        prixUnitaire: article.prixUnitaire,
-        prixTotal: article.prixTotal
+        quantite: article.quantite ?? 0,
+        prixUnitaire: article.prixUnitaire ?? 0,
+        prixTotal: (article.quantite ?? 0) * (article.prixUnitaire ?? 0)
       }))
     };
 
@@ -350,9 +350,9 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     const articles: ArticleTable[] = bl.articles.map(article => ({
       designation: article.designation,
       description: article.description,
-      quantite: article.quantite,
-      prixUnitaire: article.prixUnitaire,
-      prixTotal: article.prixTotal
+      quantite: article.quantite ?? 0,
+      prixUnitaire: article.prixUnitaire ?? 0,
+      prixTotal: (article.quantite ?? 0) * (article.prixUnitaire ?? 0)
     }));
 
     this.articlesSubject.next(articles);
