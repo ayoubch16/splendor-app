@@ -87,7 +87,6 @@ export class FormBlComponent implements OnInit, AfterViewInit {
   isEditMode = false;
 
   dataSource: MatTableDataSource<Bl> = new MatTableDataSource<Bl>();
-  private _paginator!: MatPaginator;
 
   constructor(
     private dataService: DataService,
@@ -99,10 +98,6 @@ export class FormBlComponent implements OnInit, AfterViewInit {
   ) { }
 
   ngOnInit(): void {
-    this.articles$.subscribe(() => {
-      this.calculerTotaux();
-    });
-
     this.loadClients();
     this.loadArticles();
     this.loadBls();
@@ -264,12 +259,11 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     this.nouvelArticle = { ...this.articlesSubject.value[index] };
   }
 
-  calculerTotaux(): void {
-    // Pas de calcul de total pour les BLs (optionnel selon besoin)
-  }
-
   // Méthodes pour la gestion des BLs
   async enregistrerBl(): Promise<void> {
+    // Un BL se crée uniquement depuis un devis : ce formulaire ne sert qu'à la modification
+    if (!this.isEditMode || !this.currentBlId) return;
+
     if (!this.selectedClientId || this.articles.length === 0) {
       this.showErrorMessage('Veuillez sélectionner un client et ajouter au moins un article');
       return;
@@ -279,20 +273,19 @@ export class FormBlComponent implements OnInit, AfterViewInit {
     if (!client) return;
 
     const confirmed = await this.openConfirmationDialog(
-      this.isEditMode ? 'Modifier BL' : 'Créer BL',
-      this.isEditMode
-        ? `Voulez-vous modifier le BL ${this.blNumber} ?`
-        : `Voulez-vous créer un nouveau BL pour ${client.raisonSociale} ?`
+      'Modifier BL',
+      `Voulez-vous modifier le BL ${this.blNumber} ?`
     );
 
     if (!confirmed) return;
 
     this.isLoading = true;
     const bl: Bl = {
-      id: this.currentBlId || 0,
+      id: this.currentBlId,
       numBl: this.blNumber,
       numBC: this.bcNumber,
       client: client,
+      client_id: client.id,
       statut: StatutBL.NON_LIVRE,
       date: this.blDate,
       articles: this.articles.map(article => ({
@@ -304,24 +297,19 @@ export class FormBlComponent implements OnInit, AfterViewInit {
       }))
     };
 
-    const operation$ = this.isEditMode
-      ? this.dataService.updateBl(this.currentBlId!, bl)
-      : this.dataService.createBl(bl.id);
-
-    operation$.pipe(
+    this.dataService.updateBl(this.currentBlId, bl).pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
       next: (savedBl) => {
-        const operationType = this.isEditMode ? OperationType.UPDATE : OperationType.CREATE;
         this.logOperation(
-          operationType,
+          OperationType.UPDATE,
           savedBl.id!,
-          `${operationType} BL ${savedBl.numBl}`,
-          this.isEditMode ? bl : null,
+          `${OperationType.UPDATE} BL ${savedBl.numBl}`,
+          bl,
           savedBl
         );
 
-        this.showSuccessMessage(`BL ${this.isEditMode ? 'modifié' : 'créé'} avec succès`);
+        this.showSuccessMessage('BL modifié avec succès');
         this.loadBls();
         this.resetForm();
       },

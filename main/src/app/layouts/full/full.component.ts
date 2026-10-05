@@ -15,6 +15,7 @@ import { HeaderComponent } from './header/header.component';
 import { SidebarComponent } from './sidebar/sidebar.component';
 import { AppNavItemComponent } from './sidebar/nav-item/nav-item.component';
 import { navItems } from './sidebar/sidebar-data';
+import { AuthService } from 'src/app/services/auth.service';
 
 const MOBILE_VIEW = 'screen and (max-width: 768px)';
 const TABLET_VIEW = 'screen and (min-width: 769px) and (max-width: 1024px)';
@@ -37,7 +38,12 @@ const TABLET_VIEW = 'screen and (min-width: 769px) and (max-width: 1024px)';
   standalone: true
 })
 export class FullComponent implements OnDestroy {
-  navItems = navItems;
+  // N'affiche que les items de menu autorisés pour le rôle de l'utilisateur connecté.
+  navItems = navItems.filter((item) => {
+    if (!item.roles || item.roles.length === 0) return true;
+    const currentUser = this.authService.getCurrentUser();
+    return !!currentUser && item.roles.includes(currentUser.role);
+  });
 
   @ViewChild('leftsidenav')
   public sidenav: MatSidenav;
@@ -59,6 +65,7 @@ export class FullComponent implements OnDestroy {
     private settings: CoreService,
     private router: Router,
     private breakpointObserver: BreakpointObserver,
+    private authService: AuthService,
   ) {
     this.htmlElement = document.querySelector('html')!;
     this.layoutChangesSubscription = this.breakpointObserver

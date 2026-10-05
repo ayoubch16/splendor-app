@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
+import {AfterViewInit, Component, OnInit, ViewChild} from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from "@angular/forms";
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from "@angular/material/autocomplete";
 import { MatDialog } from '@angular/material/dialog';
@@ -10,7 +10,7 @@ import {
   Article,
   ArticleTable,
   Client,
-  Devis, EmailPayload, EntityType, OperationType,
+  Devis, EntityType, OperationType,
   StatutDevis,
   TypeDocument
 } from "../../../interfaces/entites";
@@ -30,13 +30,11 @@ import { EventBusService } from "../../../services/event-bus.service";
 import { Event } from "../../../interfaces/EmitEvent";
 import { PdfService } from "../../../services/pdf.service";
 import { ChangeStatusComponent } from "../../../components/change-status/change-status.component";
-import { SendEmailComponent } from "../../../components/send-email/send-email.component";
 import { PdfViewerModalComponent } from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
 import { ConfirmationModalComponent } from "../../../components/confirmation-modal/confirmation-modal.component";
 import {PdfV2Service} from "../../../services/pdfV2.service";
 import {DownloadDevisComponent} from "../download-devis/download-devis.component";
 import {DownloadDevisPrintComponent} from "../download-devis-print/download-devis-print.component";
-import {EmailService} from "../../../services/email.service";
 import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
 import {TraceabilityService} from "../../../services/traceability.service";
 import {AuthService} from "../../../services/auth.service";
@@ -64,8 +62,7 @@ import {AuthService} from "../../../services/auth.service";
     DownloadDevisPrintComponent,
     MatPaginatorModule,
   ],
-  templateUrl: './form-devis.component.html',
-  styleUrls: ['./form-devis.component.scss']
+  templateUrl: './form-devis.component.html'
 })
 export class FormDevisComponent implements OnInit, AfterViewInit {
   clients: Client[] = [];
@@ -84,7 +81,6 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
   selectedArticle: Article | null = null;
 
   selectedClientId: number | null = null;
-  selectedArticleId: number | null = null;
 
   colonnesAffichees: string[] = ['#', 'designation', 'description', 'category', 'quantite', 'prixUnitaire', 'remise', 'prixTotal', 'actions'];
   displayedColumns2: string[] = ['numDevis', 'clientName', 'montant', 'remiseDevis', 'statut', 'date', 'menu'];
@@ -109,8 +105,6 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
   statutsDevis: StatutDevis[] = Object.values(StatutDevis);
   remiseDevis: number = 0;
 
-  @Output() articlesChanged = new EventEmitter<ArticleTable[]>();
-
   constructor(
     private dataService: DataService,
     private dialog: MatDialog,
@@ -118,7 +112,6 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
     private eventBusService: EventBusService,
     private pdfService: PdfService,
     private pdfV2Service: PdfV2Service,
-    private emailService: EmailService,
     private traceabilityService: TraceabilityService,
     private authService: AuthService
   ) { }
@@ -158,9 +151,8 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
   }
 
   private configurerSubscriptions(): void {
-    this.articles$.subscribe(articles => {
+    this.articles$.subscribe(() => {
       this.calculerTotaux();
-      this.articlesChanged.emit(articles);
     });
 
     this.clientFilterCtrl.valueChanges
@@ -310,7 +302,6 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
 
   onArticleSelected(event: MatAutocompleteSelectedEvent): void {
     this.selectedArticle = event.option.value;
-    this.selectedArticleId = this.selectedArticle?.id || null;
 
     if (this.selectedArticle) {
       this.nouvelArticle.description = this.selectedArticle.descriptionArticle;
@@ -792,100 +783,5 @@ export class FormDevisComponent implements OnInit, AfterViewInit {
       : parts[0];
 
     return parseFloat(cleanValue) || 0;
-  }
-
-  async envoyerParMail(devis: Devis): Promise<void> {
-    const dialogRef = this.dialog.open(SendEmailComponent, {
-      width: '600px',
-      data: {
-        documentId: devis.id!,
-        documentNumber: devis.numDevis,
-        clientEmail: devis.client?.email,
-        typeDocument: TypeDocument.DEVIS,
-        options: {
-          imprimable: true
-        }
-      }
-    });
-
-    dialogRef.afterClosed().subscribe(async (resultEmail) => {
-      if (resultEmail) {
-        this.isLoading = true;
-
-        try {
-          let pdfBase64 = '';
-          let fileName = '';
-
-          if (resultEmail.options?.imprimable) {
-            this.showInfoMessage('Génération du PDF en cours...');
-
-            const pdfOptions = {
-              type: TypeDocument.DEVIS,
-              withSignature: true,
-              printVersion: true
-            };
-
-            const pdfBlob = await this.pdfService.generatePdf(devis, pdfOptions);
-            pdfBase64 = await this.blobToBase64(pdfBlob);
-            fileName = `devis-${devis.numDevis}.pdf`;
-          }
-
-          const payload: EmailPayload = {
-            email: resultEmail.email,
-            subject: resultEmail.subject || `Devis ${devis.numDevis}`,
-            message: resultEmail.message || `Veuillez trouver ci-joint notre devis n°${devis.numDevis}.`,
-            imprimable: resultEmail.options?.imprimable || false,
-            pdfBase64: pdfBase64,
-            fileName: fileName
-          };
-
-          this.dataService.sendDevisByEmail(devis.id!, payload)
-            .pipe(finalize(() => this.isLoading = false))
-            .subscribe({
-              next: (response) => {
-                if (response.success) {
-                  this.logOperation(
-                    OperationType.EMAIL_SENT,
-                    devis.id!,
-                    `Email envoyé à ${resultEmail.email}`,
-                    null,
-                    { email: resultEmail.email, subject: payload.subject }
-                  );
-                  this.showSuccessMessage('Email envoyé avec succès');
-                } else {
-                  this.showErrorMessage(`Erreur: ${response.message}`);
-                }
-              },
-              error: (error) => {
-                this.showErrorMessage(`Erreur lors de l'envoi: ${error.message}`);
-              }
-            });
-
-        } catch (error) {
-          this.isLoading = false;
-          this.showErrorMessage(`Erreur lors de la génération du PDF:`);
-        }
-      }
-    });
-  }
-
-  private blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64String = (reader.result as string).split(',')[1];
-        resolve(base64String);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  private showInfoMessage(message: string): void {
-    console.info('Info:', message);
-  }
-
-  onRemiseDevisChange(): void {
-    this.calculerTotaux();
   }
 }

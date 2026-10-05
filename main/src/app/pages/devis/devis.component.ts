@@ -5,8 +5,7 @@ import {FormDevisComponent} from "./form-devis/form-devis.component";
   selector: 'app-devis',
   imports: [FormDevisComponent],
   templateUrl: './devis.component.html',
-  standalone: true,
-  styleUrl: './devis.component.scss'
+  standalone: true
 })
 export class DevisComponent {
 

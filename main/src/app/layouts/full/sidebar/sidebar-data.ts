@@ -1,4 +1,5 @@
 import { NavItem } from './nav-item/nav-item';
+import { ERole } from '../../../interfaces/entites';
 
 export const navItems: NavItem[] = [
   {
@@ -38,6 +39,13 @@ export const navItems: NavItem[] = [
     displayName: 'Historiques',
     iconName: 'solar:history-line-duotone',
     route: '/traceability',
+    roles: [ERole.ROLE_ADMIN, ERole.ROLE_SUPER_ADMIN],
+  },
+  {
+    displayName: 'Utilisateurs',
+    iconName: 'solar:shield-user-line-duotone',
+    route: '/users',
+    roles: [ERole.ROLE_ADMIN, ERole.ROLE_SUPER_ADMIN],
   },
   {
     displayName: 'Mon Profil',

@@ -51,6 +51,11 @@ export const routes: Routes = [
           import('./pages/profil/profil.routes').then((m) => m.ProfilRoutes),
       },
       {
+        path: 'users',
+        loadChildren: () =>
+          import('./pages/users/users.routes').then((m) => m.UsersRoutes),
+      },
+      {
         path: 'traceability',
         loadChildren: () =>
           import('./pages/traceability/traceability.routes').then((m) => m.TraceabilityRoutes),

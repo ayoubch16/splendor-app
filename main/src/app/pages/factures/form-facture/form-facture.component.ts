@@ -17,7 +17,6 @@ import { finalize } from 'rxjs/operators';
 import {Article, ArticleTable, Client, EntityType, Facture, OperationType, StatutFacture, TypeDocument} from "../../../interfaces/entites";
 import { DataService } from "../../../services/data.service";
 import {MatSpinner} from "@angular/material/progress-spinner";
-import {DomSanitizer} from "@angular/platform-browser";
 import {PdfService} from "../../../services/pdf.service";
 import {PdfViewerModalComponent} from "../../../components/pdf-viewer-modal/pdf-viewer-modal.component";
 import {DownloadFactureComponent} from "../download-facture/download-facture.component";
@@ -51,8 +50,7 @@ import {ConfirmationModalComponent} from "../../../components/confirmation-modal
     MatPaginator,
     MatPaginatorModule
   ],
-  templateUrl: './form-facture.component.html',
-  styleUrls: ['./form-facture.component.scss']
+  templateUrl: './form-facture.component.html'
 })
 export class FormFactureComponent implements OnInit, AfterViewInit {
   clients: Client[] = [];
@@ -93,7 +91,6 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
   isEditMode = false;
 
   dataSource: MatTableDataSource<Facture> = new MatTableDataSource<Facture>();
-  private _paginator!: MatPaginator;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
@@ -102,7 +99,6 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private pdfService: PdfService,
-    private sanitizer: DomSanitizer,
     private authService: AuthService,
     private traceabilityService: TraceabilityService
   ) { }
@@ -282,6 +278,9 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
 
   // Méthodes pour la gestion des factures
   async enregistrerFacture(): Promise<void> {
+    // Une facture se crée uniquement depuis un devis : ce formulaire ne sert qu'à la modification
+    if (!this.isEditMode || !this.currentFactureId) return;
+
     if (!this.selectedClientId || this.articles.length === 0) {
       this.showErrorMessage('Veuillez sélectionner un client et ajouter au moins un article');
       return;
@@ -291,20 +290,19 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
     if (!client) return;
 
     const confirmed = await this.openConfirmationDialog(
-      this.isEditMode ? 'Modifier facture' : 'Créer facture',
-      this.isEditMode
-        ? `Voulez-vous modifier la facture ${this.factureNumber} ?`
-        : `Voulez-vous créer une nouvelle facture pour ${client.raisonSociale} ?`
+      'Modifier facture',
+      `Voulez-vous modifier la facture ${this.factureNumber} ?`
     );
 
     if (!confirmed) return;
 
     this.isLoading = true;
     const facture: Facture = {
-      id: this.currentFactureId || undefined,
+      id: this.currentFactureId,
       numFacture: this.factureNumber,
       numBC : this.bcNumber,
       client: client,
+      client_id: client.id,
       montant: Number(this.totalTTC).toFixed(2),
       statut: StatutFacture.NON_PAYEE,
       date: this.factureDate,
@@ -317,24 +315,19 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
       }))
     };
 
-    const operation$ = this.isEditMode
-      ? this.dataService.updateFacture(this.currentFactureId!, facture)
-      : this.dataService.createFacture(facture.id!);
-
-    operation$.pipe(
+    this.dataService.updateFacture(this.currentFactureId, facture).pipe(
       finalize(() => this.isLoading = false)
     ).subscribe({
       next: (savedFacture) => {
-        const operationType = this.isEditMode ? OperationType.UPDATE : OperationType.CREATE;
         this.logOperation(
-          operationType,
+          OperationType.UPDATE,
           savedFacture.id!,
-          `${operationType} facture ${savedFacture.numFacture}`,
-          this.isEditMode ? facture : null,
+          `${OperationType.UPDATE} facture ${savedFacture.numFacture}`,
+          facture,
           savedFacture
         );
 
-        this.showSuccessMessage(`Facture ${this.isEditMode ? 'modifiée' : 'créée'} avec succès`);
+        this.showSuccessMessage('Facture modifiée avec succès');
         this.loadFactures();
         this.resetForm();
       },
@@ -510,7 +503,7 @@ export class FormFactureComponent implements OnInit, AfterViewInit {
           .then(pdfBlob => {
             const pdfFile = new File([pdfBlob], `facture_${facture.numFacture}.pdf`);
 
-            this.dataService.sendEmailAsJson(
+            this.dataService.sendEmail(
               {
                 to: resultEmail.email,
                 subject: resultEmail.subject || `Facture ${facture.numFacture}`,

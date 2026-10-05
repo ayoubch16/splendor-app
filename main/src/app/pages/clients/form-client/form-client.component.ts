@@ -66,7 +66,6 @@ export class FormClientComponent implements OnInit, AfterViewInit {
   filteredVilles: Observable<Ville[]>;
 
   dataSource: MatTableDataSource<Client> = new MatTableDataSource<Client>();
-  private _paginator!: MatPaginator;
 
   constructor(
     private fb: FormBuilder,

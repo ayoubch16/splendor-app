@@ -10,4 +10,6 @@ export interface NavItem {
   chipClass?: string;
   external?: boolean;
   subItemIcon?: boolean;
+  /** Si défini, l'item n'est visible que pour les utilisateurs ayant l'un de ces rôles. */
+  roles?: string[];
 }

@@ -55,7 +55,7 @@ export class ProfilComponent implements OnInit {
       email: ['', [Validators.required, Validators.email]],
       first_name: [''],
       last_name: [''],
-      password: ['', [Validators.minLength(6)]],
+      password: ['', [Validators.minLength(8)]],
       confirmPassword: ['']
     }, { validator: this.passwordMatchValidator });
   }
@@ -165,9 +165,6 @@ export class ProfilComponent implements OnInit {
     // Ne pas envoyer le mot de passe s'il n'est pas modifié
     if (!userData.password) {
       delete userData.password;
-    } else {
-      // Ici vous pourriez hacher le mot de passe avant envoi
-      // userData.password = this.hashPassword(userData.password);
     }
 
     const userId = this.authService.getCurrentUser()?.id;
@@ -203,7 +200,7 @@ export class ProfilComponent implements OnInit {
 
         // Mettre à jour les informations de l'utilisateur dans le service d'authentification
         if (this.isEditing) {
-          this.dataService.updateUser(response.id,response);
+          this.authService.setCurrentUser(response);
         }
       },
       error => {

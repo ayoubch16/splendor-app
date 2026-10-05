@@ -8,9 +8,7 @@ import { MatCardModule } from "@angular/material/card";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
 import { MatButtonModule } from "@angular/material/button";
-import { HttpClientModule } from '@angular/common/http';
 import {AuthService} from "../../../services/auth.service";
-import {DataService} from "../../../services/data.service";
 
 @Component({
   selector: 'app-login',
@@ -25,15 +23,13 @@ import {DataService} from "../../../services/data.service";
     MatIconModule,
     MatLabel,
     MatError,
-    CommonModule,
-    HttpClientModule
+    CommonModule
   ],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss']
 })
 export class LoginComponent {
   loginForm: FormGroup;
-  submitted = false;
   isLoading = false;
   errorMessage = '';
 
@@ -41,7 +37,6 @@ export class LoginComponent {
     private fb: FormBuilder,
     private router: Router,
     private authService: AuthService,
-    private dataService: DataService,
   ) {
     this.loginForm = this.fb.group({
       username: ['', [Validators.required]],

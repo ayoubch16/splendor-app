@@ -1,15 +1,16 @@
-// src/app/services/pdf.service.ts
+// src/app/services/pdfV2.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import {PdfViewerModalComponent} from "../components/pdf-viewer-modal/pdf-viewer-modal.component";
 import {MatDialog} from "@angular/material/dialog";
 import { BASE_URL } from "../config";
+import {endpoints} from "../const/endpoints";
 
 @Injectable({
   providedIn: 'root'
 })
 export class PdfV2Service {
-  private apiUrl = BASE_URL;
+  private pdfUrl = `${BASE_URL}${endpoints.file.genererPDF}`;
 
 
   constructor(private http: HttpClient,
@@ -18,13 +19,12 @@ export class PdfV2Service {
 
   downloadPdf(documentType: 'devis'|'facture'|'bl', documentId: number, imprimable : boolean): void {
     this.http.post(
-      `${this.apiUrl}/download-pdf`,
+      this.pdfUrl,
       { type: documentType, id: documentId , imprimable:imprimable},
-      { responseType: 'blob' as 'json' } // Solution clé ici
+      { responseType: 'blob' }
     ).subscribe({
-      next: (response: any) => {
-        const blob = new Blob([response], { type: 'application/pdf' });
-        this.savePdf(blob, documentType, documentId,imprimable);
+      next: (pdfBlob: Blob) => {
+        this.savePdf(pdfBlob, documentType, documentId);
       },
       error: (err) => {
         console.error('Erreur lors du téléchargement', err);
@@ -32,7 +32,7 @@ export class PdfV2Service {
     });
   }
 
-  public savePdf(blob: Blob, type: string, id: number,imprimable:boolean): void {
+  public savePdf(blob: Blob, type: string, id: number): void {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -47,11 +47,11 @@ export class PdfV2Service {
 
   previewPdf(documentType: 'devis'|'facture'|'bl', documentId: number,imprimable : boolean): void {
     this.http.post(
-      `${this.apiUrl}/download-pdf`,
+      this.pdfUrl,
       { type: documentType, id: documentId,imprimable : imprimable },
-      { responseType: 'blob' } // La réponse est un Blob
+      { responseType: 'blob' }
     ).subscribe({
-      next: (pdfBlob: Blob) => { // Type corrigé en Blob
+      next: (pdfBlob: Blob) => {
         this.openPdfModal(pdfBlob, documentType, documentId);
       },
       error: (err) => {
@@ -66,7 +66,7 @@ export class PdfV2Service {
       maxWidth: '900px',
       data: {
         title: `${type.toUpperCase()} N°${id}`,
-        pdfBlob: pdfBlob, // Doit être un Blob
+        pdfBlob: pdfBlob,
         filename: `${type}_${id}_${new Date().toISOString().slice(0,10)}.pdf`
       }
     });

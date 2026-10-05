@@ -3,11 +3,10 @@ import { HttpClient } from '@angular/common/http';
 import {map, Observable} from "rxjs";
 import {
   Article,
-  ArticleTableDevis,
   Bl, CategoriesData,
   CategoryArticle,
   Client,
-  Devis, EmailPayload,
+  Devis,
   Facture,
   StatutBL, StatutDevis, StatutFacture,
   User,
@@ -33,10 +32,6 @@ export class DataService {
     return this.httpService.get(endpoints.article.list)
   }
 
-  getArticleById(id: number): Observable<Article> {
-    return this.httpService.get(endpoints.article.getOne(id))
-  }
-
   saveArticle(article: Article): Observable<Article> {
     return this.httpService.post(endpoints.article.create, article)
   }
@@ -49,11 +44,6 @@ export class DataService {
     return this.httpService.delete(endpoints.article.delete(id));
   }
 
-
-  getCategoriesFromAPI(): Observable<CategoryArticle[]> {
-    return this.httpService.get(endpoints.article.listcategories)
-  }
-
   getCategories(): Observable<CategoryArticle[]> {
     return this.http.get<CategoriesData>('assets/data/categories.json')
       .pipe(
@@ -61,26 +51,11 @@ export class DataService {
       );
   }
 
-  getNameCategory(id: number): Observable<string | null> {
-    return this.getCategories().pipe(
-      map(categories => {
-        const found = categories.find(cat => cat.id === id);
-        return found ? found.category : null;
-      })
-    );
-  }
-
-
-
 
 //**************** Clients **********************************
 
   getClients(): Observable<Client[]> {
     return this.httpService.get(endpoints.client.list)
-  }
-
-  getClientById(id: number): Observable<Client> {
-    return this.httpService.get(endpoints.client.getOne(id))
   }
 
   saveClient(client: Client): Observable<Client> {
@@ -124,43 +99,35 @@ export class DataService {
     return this.httpService.get(endpoints.shared.getCptDevis)
   }
 
-  getCptBl(): any {
+  getCptBl(): Observable<number> {
     return this.httpService.get(endpoints.shared.getCptBl)
   }
 
-  getCptClient(): any {
-    return this.httpService.get(endpoints.shared.getCptClient)
-  }
-
-  sendDevisByEmail(id: number,  payload: EmailPayload) {
-    return this.httpService.post(endpoints.devis.sendDevisByEmail(id), payload)
-  }
-
-  sendEmail(formData: FormData) {
-    return this.httpService.post(endpoints.shared.sendEmail, formData);
-  }
-
-  sendEmailAsJson(emailData: {to: string, subject: string, message: string}, pdfFile: File): Observable<any> {
+  /** Envoie un document par email : le PDF généré côté front est transmis encodé en base64. */
+  sendEmail(emailData: {to: string, subject: string, message: string}, pdfFile: File): Observable<any> {
     return new Observable(observer => {
       const reader = new FileReader();
       reader.onload = () => {
         const base64Pdf = (reader.result as string).split(',')[1];
-        this.http.post(endpoints.shared.sendEmail, {
+        this.httpService.post(endpoints.shared.sendEmail, {
           to: emailData.to,
           subject: emailData.subject,
           message: emailData.message,
           pdfBase64: base64Pdf,
           pdfFileName: pdfFile.name
-        }, {
-          headers: { 'Content-Type': 'application/json' }
-        }).subscribe(observer);
+        }, { useToken: true }).subscribe(observer);
       };
+      reader.onerror = () => observer.error(reader.error);
       reader.readAsDataURL(pdfFile);
     });
   }
 
 
   //************************* User ***************************************//
+  getUsers(): Observable<User[]> {
+    return this.httpService.get(endpoints.user.list)
+  }
+
   getUser(id:number): Observable<User> {
     return this.httpService.get(endpoints.user.getUser(id))
   }
@@ -173,25 +140,25 @@ export class DataService {
     return this.httpService.put(endpoints.user.update(id),updatedUser);
   }
 
-  //************************* Devis ***************************************//
-  getDevis(id: number): Observable<Devis> {
-    return this.httpService.get(endpoints.devis.getOne(id))
+  deleteUser(id: number): Observable<void> {
+    return this.httpService.delete(endpoints.user.delete(id));
   }
 
+  activateUser(id: number): Observable<User> {
+    return this.httpService.patch(endpoints.user.activate(id), {});
+  }
+
+  deactivateUser(id: number): Observable<User> {
+    return this.httpService.patch(endpoints.user.deactivate(id), {});
+  }
+
+  //************************* Devis ***************************************//
   getAllDevis(): Observable<Devis[]> {
     return this.httpService.get(endpoints.devis.list)
   }
 
   getLastDevis(): Observable<Devis[]> {
     return this.httpService.get(endpoints.devis.listLast)
-  }
-
-  getDevisByClient(clientId: number): Observable<Devis[]> {
-    return this.httpService.get(endpoints.devis.getByClient(clientId))
-  }
-
-  getDevisArticles(id: number): Observable<ArticleTableDevis[]> {
-    return this.httpService.get(endpoints.devis.getOne(id))
   }
 
   createDevis(devisData: Devis): Observable<Devis> {
@@ -264,15 +231,5 @@ export class DataService {
   updateBlStatut(id: number, statut: StatutBL): Observable<Bl> {
     return this.httpService.put(endpoints.bl.updateStatut(id,statut),null)
   }
-
-
-
-  //************************* PDF ***************************************//
-
-  genererPDF(data: { id: number; type: string }): Observable<void> {
-    return this.httpService.post(endpoints.file.genererPDF, data);
-  }
-
-
 
 }

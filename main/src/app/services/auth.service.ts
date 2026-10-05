@@ -3,14 +3,14 @@ import { Router } from '@angular/router';
 import {tap} from 'rxjs';
 import {endpoints} from "../const/endpoints";
 import {HttpService} from "./http.service";
-import {HttpClient} from "@angular/common/http";
+import {User} from "../interfaces/entites";
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  redirectUrl: string | null = null; // Ajoutez cette propriété
-  constructor(private http: HttpClient,private httpService: HttpService,private router: Router) {
+  redirectUrl: string | null = null;
+  constructor(private httpService: HttpService,private router: Router) {
   }
 
   login(credentials: { username: string, password: string }) {
@@ -23,7 +23,7 @@ export class AuthService {
 
   private setSession(authResult: any) {
     localStorage.setItem('auth_token', authResult.token);
-    localStorage.setItem('user', JSON.stringify(authResult.user));
+    this.setCurrentUser(authResult.user);
   }
 
   logout() {
@@ -39,6 +39,11 @@ export class AuthService {
   getCurrentUser() {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  }
+
+  /** Met à jour l'utilisateur connecté en session (ex: après modification de son profil). */
+  setCurrentUser(user: User) {
+    localStorage.setItem('user', JSON.stringify(user));
   }
 
 }

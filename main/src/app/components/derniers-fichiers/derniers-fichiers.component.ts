@@ -4,8 +4,8 @@ import { MatTableModule } from '@angular/material/table';
 import { MatMenuModule } from '@angular/material/menu';
 import { CommonModule, DatePipe } from '@angular/common';
 import {DataService} from "../../services/data.service";
-import {map, Observable} from "rxjs";
-import {Bl, Devis, EntityType, Facture, OperationType, TypeDocument} from "../../interfaces/entites";
+import {Observable} from "rxjs";
+import {Bl, Devis, Facture, TypeDocument} from "../../interfaces/entites";
 import {
   DownloadFacturePrintComponent
 } from "../../pages/factures/download-facture-print/download-facture-print.component";
@@ -18,8 +18,6 @@ import {PdfViewerModalComponent} from "../pdf-viewer-modal/pdf-viewer-modal.comp
 import {PdfService} from "../../services/pdf.service";
 import {MatDialog} from "@angular/material/dialog";
 import {MatSnackBar} from "@angular/material/snack-bar";
-import {AuthService} from "../../services/auth.service";
-import {TraceabilityService} from "../../services/traceability.service";
 
 
 @Component({
@@ -40,9 +38,6 @@ export class DerniersFichiersComponent implements OnInit {
     private pdfService: PdfService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-    private authService: AuthService,
-    private traceabilityService: TraceabilityService,
-
   ) { }
 
   ngOnInit(): void {
@@ -58,16 +53,15 @@ export class DerniersFichiersComponent implements OnInit {
 
 
   chargerDerniersFichiers(): void {
-    // Simulation de données - À remplacer par un appel API réel
     switch(this.typeDocument) {
       case 'FACTURE':
-        this.listeFichiers = this.getSampleFactures();
+        this.listeFichiers = this.dataService.getLastFactures();
         break;
       case 'DEVIS':
-        this.listeFichiers = this.getSampleDevis();
+        this.listeFichiers = this.dataService.getLastDevis();
         break;
       case 'BL':
-        this.listeFichiers = this.getSampleBL();
+        this.listeFichiers = this.dataService.getLastBls();
         break;
     }
   }
@@ -81,20 +75,6 @@ export class DerniersFichiersComponent implements OnInit {
     }
   }
 
-
-
-  // Exemples de données (à remplacer par des appels API)
-   getSampleFactures(): Observable<Facture[]> {
-    return this.dataService.getLastFactures()
-  }
-
-  getSampleDevis(): Observable<Devis[]> {
-    return this.dataService.getLastDevis()
-  }
-
-  private getSampleBL(): Observable<Bl[]>  {
-    return this.dataService.getLastBls()
-  }
 
   getIconClass(): string {
     switch(this.typeDocument) {

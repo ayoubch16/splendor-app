@@ -1,5 +1,5 @@
-export const BASE_URL = 'https://splendorart.ma/app/api/index.php';
-// export const BASE_URL = 'http://localhost:8000';
+// export const BASE_URL = 'https://splendorart.ma/app/api/index.php';
+export const BASE_URL = 'http://localhost:8000';
 
 export interface AppSettings {
 

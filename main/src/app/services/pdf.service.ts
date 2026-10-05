@@ -16,10 +16,8 @@ interface GeneratePdfOptions {
 })
 export class PdfService {
   private readonly HEADER_IMAGE = 'assets/images/header-entete-splendor.png';
-  private readonly FOOTER_IMAGE = 'assets/images/footer-entete-splendor.png';
   private readonly SIGNATURE_IMAGE = 'assets/images/sig-splendort.png';
   private readonly HEADER_HEIGHT = 40;
-  private readonly FOOTER_HEIGHT = 30;
   private readonly SIGNATURE_HEIGHT = 30;
   private readonly SIGNATURE_WIDTH = 80;
   private readonly BOTTOM_CONTENT_MARGIN = 35;
@@ -248,10 +246,12 @@ export class PdfService {
     let line4Width = 0;
     for (const f of fiscals) {
       doc.setFont('helvetica', 'bold');
-      f.labelW = doc.getTextWidth(f.label);
+      const labelW = doc.getTextWidth(f.label);
       doc.setFont('helvetica', 'normal');
-      f.valueW = doc.getTextWidth(f.value);
-      line4Width += f.labelW + f.valueW;
+      const valueW = doc.getTextWidth(f.value);
+      f.labelW = labelW;
+      f.valueW = valueW;
+      line4Width += labelW + valueW;
     }
     let x4 = cx - line4Width / 2;
     for (const f of fiscals) {
@@ -467,7 +467,6 @@ export class PdfService {
     const colQtyWidth         = tableWidth * 0.10;
     const colUnitPriceWidth   = tableWidth * 0.10;
     const colRemiseWidth      = hasRemise ? tableWidth * 0.10 : 0;
-    const colTotalWidth       = tableWidth * 0.15;
 
     const drawHeaderRow = (yStart: number): number => {
       doc.setFillColor(50, 50, 50);

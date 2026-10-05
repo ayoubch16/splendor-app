@@ -60,6 +60,7 @@ export interface Bl {
   date: string;
   articles: ArticleTableBl[];
   numBC?:string;
+  client_id?: number;
 }
 
 export interface CategoryArticle {
@@ -112,7 +113,8 @@ export interface User {
   id: number;
   username: string;
   email: string;
-  password: string;
+  // Optionnel : jamais renvoyé par le backend, et laissé vide en édition pour ne pas changer le mot de passe
+  password?: string;
   first_name: string;
   last_name: string;
   isActive: boolean;
@@ -129,30 +131,6 @@ export interface Ville {
 export interface VillesData {
   villes: Ville[];
 }
-
-export interface LoginRequest {
-  username: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  user: {
-    id: number;
-    username: string;
-    email: string;
-    role: string;
-    first_name: string;
-    last_name: string;
-  };
-}
-
-export interface InfromationPdf {
-  type:string,
-  id:number
-}
-
-
 
 // Enums
 export enum TypeDocument {
@@ -186,26 +164,6 @@ export enum ERole {
   ROLE_VENDEUR = 'ROLE_VENDEUR',
   ROLE_COMPTABLE = 'ROLE_COMPTABLE',
   ROLE_COMMERCIAL = 'ROLE_COMMERCIAL'
-}
-
-export interface PdfDocument {
-  id: number;
-  reference: string;
-  client:Client
-}
-
-export interface EmailPayload {
-  email: string;
-  subject: string;
-  message: string;
-  imprimable: boolean;
-  pdfBase64?: string; // PDF encodé en base64
-  fileName?: string;
-}
-
-export interface EmailResponse {
-  success: boolean;
-  message: string;
 }
 
 export interface TraceOperation {
